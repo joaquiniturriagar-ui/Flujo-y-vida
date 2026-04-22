@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "firebase/firestore";
+import { getFirestore, doc, setDoc, onSnapshot } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBh9x8JiPrOKmaenMzLl31D1Qvd446XQFA",
@@ -17,59 +17,56 @@ const db = getFirestore(app);
 export const saveData = async (newData) => {
   try {
     const docRef = doc(db, "users", "mainData");
-    
-    // 1. Obtenemos lo que hay actualmente en Firebase para comparar
-    const snap = await getDoc(docRef);
-    if (!snap.exists()) {
-      await setDoc(docRef, newData);
-      return;
-    }
-    const oldData = snap.data();
 
-    // 2. Revisamos si hay un gasto nuevo (el último de la lista)
-    if (newData.exps && newData.exps.length > 0) {
-      const lastExpIndex = newData.exps.length - 1;
-      const lastExp = newData.exps[lastExpIndex];
+    // --- LÓGICA DE PROCESAMIENTO TOTAL ---
+    if (newData.exps && newData.debts) {
+      let debtsActualizados = [...newData.debts];
+      let expsActualizados = newData.exps.map(exp => {
+        
+        // Si el gasto NO ha sido procesado (no tiene el campo 'done')
+        if (!exp.done) {
+          const monto = Number(exp.amount || 0);
+          const tarjetaGasto = String(exp.card || "").trim().toLowerCase();
 
-      // SOLO procesamos si el gasto NO tiene la marca 'processed'
-      // Esto evita que el bucle infinito empiece
-      if (lastExp && !lastExp.processed) {
-        const montoGasto = Number(lastExp.amount || lastExp.originalAmount || 0);
-        const tarjetaGasto = String(lastExp.card || "").trim();
+          if (monto > 0 && tarjetaGasto !== "") {
+            // Buscamos la tarjeta en la lista de deudas
+            debtsActualizados = debtsActualizados.map(debt => {
+              const nombreD = String(debt.name || "").trim().toLowerCase();
+              const idD = String(debt.id || "").trim().toLowerCase();
 
-        if (montoGasto > 0 && tarjetaGasto !== "" && newData.debts) {
-          // Actualizamos la deuda en el objeto que vamos a guardar
-          newData.debts = newData.debts.map(debt => {
-            const nombreD = String(debt.name || "").trim();
-            const idD = String(debt.id || "").trim();
-            
-            if (nombreD === tarjetaGasto || idD === tarjetaGasto) {
-              const actual = Number(debt.usado) || 0;
-              return { ...debt, usado: actual + montoGasto };
-            }
-            return debt;
-          });
-
-          // MARCAMOS EL GASTO COMO PROCESADO
-          // Así, cuando onSnapshot detecte el cambio, este IF ya no entrará
-          newData.exps[lastExpIndex] = { ...lastExp, processed: true };
+              // Si hay match, sumamos al campo 'usado'
+              if (nombreD === tarjetaGasto || idD === tarjetaGasto) {
+                console.log(`Sumando ${monto} a ${debt.name}`);
+                return { ...debt, usado: (Number(debt.usado) || 0) + monto };
+              }
+              return debt;
+            });
+          }
+          // Le ponemos el sello 'done' para que NUNCA más se vuelva a sumar
+          return { ...exp, done: true };
         }
-      }
+        // Si ya tenía el sello, lo dejamos tal cual
+        return exp;
+      });
+
+      // Sobrescribimos con los datos procesados
+      newData.exps = expsActualizados;
+      newData.debts = debtsActualizados;
     }
 
-    // 3. Guardamos los datos finales
+    // Guardado definitivo
     await setDoc(docRef, newData);
-    console.log("Guardado exitoso con freno de bucle.");
+    console.log("✅ Sincronización completada.");
 
   } catch (e) {
-    console.error("Error al guardar: ", e);
+    console.error("❌ Error crítico:", e);
   }
 };
 
 export const onDataChange = (callback) => {
-  return onSnapshot(doc(db, "users", "mainData"), (doc) => {
-    if (doc.exists()) {
-      callback(doc.data());
+  return onSnapshot(doc(db, "users", "mainData"), (snapshot) => {
+    if (snapshot.exists()) {
+      callback(snapshot.data());
     }
   });
 };
