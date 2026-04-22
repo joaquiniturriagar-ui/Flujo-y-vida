@@ -14,18 +14,23 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-export const saveData = async (data) => {
+export async function saveData(data) {
   try {
-    await setDoc(doc(db, "users", "mainData"), data);
+    await setDoc(doc(db, "users", "mainData"), {
+      ...data,
+      updatedAt: new Date().toISOString(),
+    });
   } catch (e) {
-    console.error("Error guardando datos: ", e);
+    console.error("Error guardando:", e);
   }
-};
+}
 
-export const onDataChange = (callback) => {
-  return onSnapshot(doc(db, "users", "mainData"), (doc) => {
-    if (doc.exists()) callback(doc.data());
+export function onDataChange(callback) {
+  return onSnapshot(doc(db, "users", "mainData"), (snap) => {
+    if (snap.exists()) {
+      callback(snap.data());
+    }
   });
-};
+}
 
 export { db };
