@@ -187,13 +187,13 @@ function QuickEntry({ onClose, onSaveExp, onSavePay, onSaveDeposit, expenses, cu
         <div style={{ marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 28, fontWeight: 700, color: modeColors[mode], fontFamily: "'JetBrains Mono',monospace" }}>
-              {(mode === "ingreso" || cur === "AUD") ? "A$" : "$"}
+              {cur === "AUD" ? "A$" : "$"}
             </span>
             <input ref={ref} type="text" inputMode="numeric" placeholder="0" value={fa(amt)} onChange={e => setAmt(e.target.value.replace(/\./g, ""))}
               style={{ flex: 1, background: "transparent", border: "none", color: X.tx, fontSize: 32, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", outline: "none", padding: 0, width: "100%" }} />
           </div>
           <div style={{ height: 2, background: `linear-gradient(90deg,${modeColors[mode]},transparent)`, marginTop: 3 }} />
-          {(mode === "ingreso" || cur === "AUD") && amt && <div style={{ fontSize: 11, color: X.txD, marginTop: 4 }}>≈ {fmt(parseInt(amt.replace(/\D/g, ""), 10) * audRate)} CLP</div>}
+          {cur === "AUD" && amt && <div style={{ fontSize: 11, color: X.txD, marginTop: 4 }}>≈ {fmt(parseInt(amt.replace(/\D/g, ""), 10) * audRate)} CLP</div>}
         </div>
 
         {/* ── INGRESO MODE ── */}
