@@ -18,33 +18,30 @@ export const saveData = async (newData) => {
   try {
     const docRef = doc(db, "users", "mainData");
 
-    // Lógica de Auto-suma mejorada
+    // LÓGICA DE AUTO-SUMA:
     if (newData.exps && newData.debts) {
-      // Obtenemos el último gasto
       const lastExp = newData.exps[newData.exps.length - 1];
+      const montoGasto = Number(lastExp.amount || lastExp.originalAmount || 0);
       
-      // Intentamos obtener el monto (probamos con amount o originalAmount)
-      const monto = Number(lastExp.amount || lastExp.originalAmount || 0);
-      
-      // Obtenemos el nombre de la tarjeta que viene del gasto
-      const tarjetaGasto = String(lastExp.card || "").trim().toLowerCase();
+      // Obtenemos el nombre de la tarjeta del gasto y lo limpiamos
+      const tarjetaDelGasto = String(lastExp.card || "").trim();
 
-      if (monto > 0 && tarjetaGasto !== "") {
+      if (montoGasto > 0 && tarjetaDelGasto !== "") {
         newData.debts = newData.debts.map(debt => {
-          const nombreD = String(debt.name || "").trim().toLowerCase();
-          const idD = String(debt.id || "").trim().toLowerCase();
+          // Comparamos ignorando mayúsculas/minúsculas y puntos extra
+          const nombreD = String(debt.name || "").trim();
+          const idD = String(debt.id || "").trim();
 
-          // Si coincide el nombre o el ID
-          if (nombreD === tarjetaGasto || idD === tarjetaGasto) {
-            const actual = Number(debt.usado) || 0;
-            return { ...debt, usado: actual + monto };
+          if (nombreD === tarjetaDelGasto || idD === tarjetaDelGasto) {
+            const saldoAnterior = Number(debt.usado) || 0;
+            // IMPORTANTE: Sumamos el gasto al saldo usado
+            return { ...debt, usado: saldoAnterior + montoGasto };
           }
           return debt;
         });
       }
     }
 
-    // Guardar en Firebase
     await setDoc(docRef, newData);
   } catch (e) {
     console.error("Error en saveData: ", e);
