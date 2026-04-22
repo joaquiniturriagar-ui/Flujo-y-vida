@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Tooltip, ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis } from "recharts";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis } from "recharts";
 import { saveData, onDataChange } from "./firebase";
 
 // ══════════════════════════════════════════════════════════════════════
@@ -145,7 +145,6 @@ export default function App() {
   useEffect(()=>{
     return onDataChange((data)=>{
       if(data){
-        // Usamos toArray para evitar que Firestore nos devuelva Objetos en vez de Arrays
         setExps(toArray(data.exps));
         setPays(toArray(data.pays));
         setDebts(data.debts ? toArray(data.debts) : INIT_DEBTS);
@@ -184,7 +183,6 @@ export default function App() {
   const tC = useMemo(()=> debts.reduce((a,d)=>a+(d.cupo||0), 0), [debts]);
   const tB = useMemo(()=> Object.values(bud).reduce((a,v)=>a+(v||0), 0) || 1, [bud]);
   
-  // Cálculo fijo de ingresos para no complicar el render
   const totInc = Math.round(900 * 4.33 * 625) + 150000;
 
   const dPlan = useMemo(() => {
@@ -203,12 +201,15 @@ export default function App() {
 
   return(
     <div style={{minHeight:"100vh", background:X.bg, color:X.tx, fontFamily:"sans-serif", paddingBottom:100}}>
-      <div style={{padding:"20px 18px", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+      
+      {/* HEADER CENTRADO A 480px */}
+      <div style={{padding:"20px 18px", maxWidth:480, margin:"0 auto", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
         <h1 style={{fontSize:22, fontWeight:800, color:X.ac}}>Mi Flujo</h1>
         <input type="month" value={cm} onChange={e=>setCm(e.target.value)} style={{background:X.card, border:`1px solid ${X.bdr}`, borderRadius:10, color:"#fff", padding:"5px 10px", colorScheme:"dark"}}/>
       </div>
 
-      <div style={{padding:"0 18px", display:"flex", flexDirection:"column", gap:16}}>
+      {/* CONTENIDO CENTRADO A 480px */}
+      <div style={{padding:"0 18px", maxWidth:480, margin:"0 auto", display:"flex", flexDirection:"column", gap:16}}>
         {view === "home" && (
           <>
             <Cd s={{background:"linear-gradient(135deg,rgba(34,197,94,0.08),rgba(59,130,246,0.05))"}}>
@@ -274,7 +275,7 @@ export default function App() {
               </ResponsiveContainer>
               <div style={{textAlign:"center", fontWeight:800, color:X.g, marginTop:10}}>¡LIBRE EN {dPlan.length} MESES!</div>
             </Cd>
-            {debts.map((d,di)=>(<Cd key={d.id} s={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between"}}><span>{d.name}</span><span style={{fontWeight:800, color:X.r}}>{fmt(d.usado)}</span></div><Br p={pct(d.usado,d.cupo)} color={X.r}/><input type="number" value={d.usado} onChange={e=>setDebts(prev=>prev.map((x,i)=>i===di?{...x,usado:Number(e.target.value)}:x))} style={{width:"100%", background:X.bg, border:`1px solid ${X.bdr}`, padding:8, borderRadius:8, color:"#fff", marginTop:10, outline:"none"}}/></Cd>))}
+            {debts.map((d,di)=>(<Cd key={d.id} s={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between"}}><span>{d.name}</span><span style={{fontWeight:800, color:X.r}}>{fmt(d.usado)}</span></div><Br p={pct(d.usado,d.cupo)} color={X.r}/><input type="number" value={d.usado} onChange={e=>setDebts(prev=>prev.map((x,i)=>i===di?{...x,usado:Number(e.target.value)}:x))} style={{width:"100%", background:X.bg, border:`1px solid ${X.bdr}`, padding:8, borderRadius:8, color:"#fff", marginTop:10}}/></Cd>))}
           </>
         )}
 
@@ -290,9 +291,11 @@ export default function App() {
         )}
       </div>
 
-      <button onClick={()=>setShow(true)} style={{position:"fixed", bottom:85, right:20, width:64, height:64, borderRadius:32, background:X.ac, color:"#fff", fontSize:32, border:"none", boxShadow:"0 8px 20px rgba(0,0,0,0.4)"}}>+</button>
+      {/* FAB AJUSTADO A 480px */}
+      <button onClick={()=>setShow(true)} style={{position:"fixed", bottom:85, right:"max(20px, calc(50vw - 220px))", width:64, height:64, borderRadius:32, background:X.ac, color:"#fff", fontSize:32, border:"none", boxShadow:"0 8px 20px rgba(0,0,0,0.4)", zIndex:100}}>+</button>
 
-      <div style={{position:"fixed", bottom:0, left:0, right:0, background:"rgba(10,11,18,0.98)", borderTop:`1px solid ${X.bdr}`, display:"flex", padding:"10px 0 20px"}}>
+      {/* NAV CENTRADO A 480px */}
+      <div style={{position:"fixed", bottom:0, left:0, right:0, margin:"0 auto", maxWidth:480, background:"rgba(10,11,18,0.98)", borderTop:`1px solid ${X.bdr}`, display:"flex", padding:"10px 0 20px", zIndex:90}}>
         {[["home","🏠","Inicio"],["list","📋","Gastos"],["budget","🎯","Presup."],["debt","💳","Deudas"],["config","⚙️","Config"]].map(([k,ic,lb])=>(
           <button key={k} onClick={()=>setView(k)} style={{flex:1, background:"none", border:"none", color:view===k?X.ac:X.txD, fontSize:9, display:"flex", flexDirection:"column", alignItems:"center", gap:3}}>
             <span style={{fontSize:20}}>{ic}</span>{lb}
