@@ -14,7 +14,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Guarda el objeto completo sin procesar nada
 export const saveData = async (data) => {
   try {
     await setDoc(doc(db, "users", "mainData"), data);
