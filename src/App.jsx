@@ -263,7 +263,9 @@ export default function App() {
     }, 800);
   },[exps,pays,rules,bud,debts,savPct]);
 
-// ── Mapeo de Tarjeta -> ID de Deuda ──
+  useEffect(()=>{if(synced)doSave();},[exps,pays,rules,bud,debts,savPct]);
+
+  // ── Mapeo de Tarjeta -> ID de Deuda ──
   const CARD_TO_DEBT = {
     "TC SANT Plat": "plat",
     "TC SANT Life": "life",
@@ -312,9 +314,11 @@ export default function App() {
       }
     }
   };
-    if(s!==e.category){const w=e.desc.toLowerCase().trim().split(/\s+/)[0];if(w&&w.length>=3&&!rules.some(r=>r.kw.includes(w)&&r.cat===e.category))setRules(p=>[...p,{kw:[w],cat:e.category}]);}
+
+  const addPay=p=>{
+    setPays(prev=>[p,...prev]);
+    setDebts(prev=>prev.map(d=>d.id===p.debtId?{...d,usado:Math.max(0,d.usado-p.amount)}:d));
   };
-  const addPay=p=>{setPays(prev=>[p,...prev]);setDebts(prev=>prev.map(d=>d.id===p.debtId?{...d,usado:Math.max(0,d.usado-p.amount)}:d));};
 
   // ── Computed ──
   const mE=useMemo(()=>exps.filter(e=>mKey(e.date)===cm),[exps,cm]);
@@ -413,7 +417,7 @@ export default function App() {
         {view==="list"&&(<div style={{display:"flex",flexDirection:"column",gap:12}}>
           <Cd><h3 style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:X.txM}}>Gastos · {mLabel(cm)}</h3>
             {mE.length===0&&<div style={{textAlign:"center",padding:24,color:X.txD,fontSize:11}}>Sin gastos</div>}
-            {mE.map(e=>{const gr=GROUPS[e.group]||GROUPS.Otros;return(<div key={e.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:`1px solid ${X.bdr}`}}><div style={{width:32,height:32,borderRadius:8,background:`${gr.c}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>{gr.i}</div><div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:600}}>{e.desc}</div><div style={{fontSize:9,color:X.txD}}>{e.category} · {e.card} · {e.date}{e.currency==="AUD"?` (A$${e.originalAmount})`:""}</div></div><div style={{fontSize:13,fontWeight:700,fontFamily:"'JetBrains Mono',monospace"}}>{fmt(e.amount)}</div><button onClick={()=>{if(confirm("¿Eliminar?"))setExps(p=>p.filter(x=>x.id!==e.id))}} style={{background:"transparent",border:"none",color:X.txD,fontSize:14,cursor:"pointer",padding:2}}>×</button></div>);})}
+            {mE.map(e=>{const gr=GROUPS[e.group]||GROUPS.Otros;return(<div key={e.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:`1px solid ${X.bdr}`}}><div style={{width:32,height:32,borderRadius:8,background:`${gr.c}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>{gr.i}</div><div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:600}}>{e.desc}</div><div style={{fontSize:9,color:X.txD}}>{e.category} · {e.card} · {e.date}{e.currency==="AUD"?` (A$${e.originalAmount})`:""}</div></div><div style={{fontSize:13,fontWeight:700,fontFamily:"'JetBrains Mono',monospace"}}>{fmt(e.amount)}</div><button onClick={() => deleteExp(e.id)} style={{background:"transparent",border:"none",color:X.txD,fontSize:14,cursor:"pointer",padding:2}}>×</button></div>);})}
           </Cd>
           {mP.length>0&&<Cd><h3 style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:X.g}}>💳 Pagos a Deuda</h3>{mP.map(p=>(<div key={p.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:`1px solid ${X.bdr}`}}><div style={{width:32,height:32,borderRadius:8,background:"rgba(34,197,94,0.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>✓</div><div style={{flex:1}}><div style={{fontSize:12,fontWeight:600,color:X.g}}>{p.debtName}</div><div style={{fontSize:9,color:X.txD}}>{p.desc} · {p.date}</div></div><span style={{fontSize:13,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:X.g}}>{fmt(p.amount)}</span></div>))}<div style={{display:"flex",justifyContent:"space-between",marginTop:8,padding:"6px 0 0",borderTop:`1px solid ${X.bdr}`}}><span style={{fontSize:12,fontWeight:700}}>Total pagado</span><span style={{fontSize:14,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",color:X.g}}>{fmt(mPd)}</span></div></Cd>}
           {mE.length>0&&<Cd><h3 style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:X.txM}}>Distribución</h3><ResponsiveContainer width="100%" height={200}><PieChart><Pie data={Object.entries(grp).sort((a,b)=>b[1]-a[1]).map(([n,v])=>({name:n,value:v}))} cx="50%" cy="50%" innerRadius={45} outerRadius={80} paddingAngle={2} dataKey="value" stroke="none">{Object.keys(grp).map((n,i)=><Cell key={i} fill={GROUPS[n]?.c||"#888"}/>)}</Pie><Tooltip formatter={v=>fmt(v)} contentStyle={{background:"#14152a",border:`1px solid ${X.bdr}`,borderRadius:10,fontSize:10}}/></PieChart></ResponsiveContainer></Cd>}
