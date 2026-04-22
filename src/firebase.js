@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, onSnapshot } from "firebase/firestore";
+import { getFirestore, doc, setDoc, onSnapshot, runTransaction } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBh9x8JiPrOKmaenMzLl31D1Qvd446XQFA",
@@ -14,42 +14,51 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Variable global para evitar procesar el mismo gasto dos veces en la misma sesión
-let lastProcessedExpenseId = null;
-
 export const saveData = async (newData) => {
+  const docRef = doc(db, "users", "mainData");
+
   try {
-    const docRef = doc(db, "users", "mainData");
+    await runTransaction(db, async (transaction) => {
+      const sfDoc = await transaction.get(docRef);
+      if (!sfDoc.exists()) {
+        transaction.set(docRef, newData);
+        return;
+      }
 
-    if (newData.exps && newData.exps.length > 0 && newData.debts) {
-      const lastExp = newData.exps[newData.exps.length - 1];
-      
-      // SOLO procesamos si el ID del gasto es diferente al último que procesamos
-      if (lastExp.id !== lastProcessedExpenseId) {
-        const montoGasto = Number(lastExp.amount || lastExp.originalAmount || 0);
-        const tarjetaDelGasto = String(lastExp.card || "").trim();
+      const oldData = sfDoc.data();
+      let updatedDebts = [...(newData.debts || [])];
+      let updatedExps = [...(newData.exps || [])];
 
-        if (montoGasto > 0 && tarjetaDelGasto !== "") {
-          newData.debts = newData.debts.map(debt => {
-            const nombreD = String(debt.name || "").trim();
-            const idD = String(debt.id || "").trim();
+      // Buscamos si hay un gasto nuevo que no esté marcado como procesado
+      updatedExps = updatedExps.map(exp => {
+        if (!exp.processed) {
+          const monto = Number(exp.amount || exp.originalAmount || 0);
+          const tarjeta = String(exp.card || "").trim();
 
-            if (nombreD === tarjetaDelGasto || idD === tarjetaDelGasto) {
-              const saldoAnterior = Number(debt.usado) || 0;
-              return { ...debt, usado: saldoAnterior + montoGasto };
+          // Buscamos la tarjeta en debts para sumar
+          updatedDebts = updatedDebts.map(debt => {
+            if (debt.name === tarjeta || debt.id === tarjeta) {
+              return { ...debt, usado: (Number(debt.usado) || 0) + monto };
             }
             return debt;
           });
-          
-          // Marcamos este gasto como "ya procesado"
-          lastProcessedExpenseId = lastExp.id;
-        }
-      }
-    }
 
-    await setDoc(docRef, newData);
+          // Marcamos como procesado para que el bucle se detenga aquí
+          return { ...exp, processed: true };
+        }
+        return exp;
+      });
+
+      transaction.update(docRef, { 
+        exps: updatedExps, 
+        debts: updatedDebts,
+        // Conservamos otros campos como 'bud' o 'pays' si existen
+        ...newData 
+      });
+    });
+    console.log("Transacción completada con éxito.");
   } catch (e) {
-    console.error("Error en saveData: ", e);
+    console.error("Error en la transacción: ", e);
   }
 };
 
