@@ -1,24 +1,36 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis } from "recharts";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { saveData, onDataChange } from "./firebase";
 
 // ══════════════════════════════════════════════════════════════════════
-// HELPERS & CONFIG
+// HELPERS Y PROTECCIÓN DE DATOS
 // ══════════════════════════════════════════════════════════════════════
 const fmt = n => { if(n==null||isNaN(n))return"$0"; const a=Math.abs(Math.round(n)); return(n<0?"-$":"$")+a.toString().replace(/\B(?=(\d{3})+(?!\d))/g,"."); };
-const fmtS = n => { const a=Math.abs(n); if(a>=1e6)return`${(n/1e6).toFixed(1)}M`; if(a>=1e3)return`${Math.round(n/1e3)}K`; return`${Math.round(n)}`; };
+const fmtS = n => { const a=Math.abs(n||0); if(a>=1e6)return`${(n/1e6).toFixed(1)}M`; if(a>=1e3)return`${Math.round(n/1e3)}K`; return`${Math.round(n||0)}`; };
 const today = () => new Date().toISOString().split("T")[0];
-const mKey = d => d ? d.slice(0,7) : today().slice(0,7);
-const mLabel = k => { if(!k) return ""; const[y,m]=k.split("-"); return`${["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"][+m-1]} ${y.slice(2)}`; };
-const pct = (a,b) => b?Math.round(a/b*100):0;
+const mKey = d => d ? String(d).slice(0,7) : today().slice(0,7);
+const mLabel = k => { if(!k) return ""; const[y,m]=String(k).split("-"); return`${["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"][+m-1]} ${y?.slice(2)}`; };
+const pct = (a,b) => b?Math.round((a||0)/(b||1)*100):0;
 const AUD_CLP = 625;
 
-// BLINDAJE CONTRA FIREBASE
-const toArray = (data) => Array.isArray(data) ? data : Object.values(data || {});
+// Blindaje contra errores de formato en Firebase
+const toArray = (data) => (data && typeof data === 'object') ? (Array.isArray(data) ? data : Object.values(data)) : [];
 
-const GROUPS = {"Vivienda":{i:"🏠",c:"#3B82F6"},"Alimentación":{i:"🍽",c:"#10B981"},"Transporte":{i:"🚗",c:"#F59E0B"},"Entretención":{i:"🎉",c:"#8B5CF6"},"Personal":{i:"👤",c:"#EC4899"},"Educación/Familia":{i:"👨‍👩‍👧",c:"#14B8A6"},"Financiero":{i:"🏦",c:"#F97316"},"Viajes":{i:"✈️",c:"#06B6D4"},"Otros":{i:"📦",c:"#94A3B8"}};
+// ══════════════════════════════════════════════════════════════════════
+// CATEGORÍAS (IGUALES A TU EXCEL)
+// ══════════════════════════════════════════════════════════════════════
+const GROUPS = {
+  "Vivienda":{i:"🏠",c:"#3B82F6"},
+  "Alimentación":{i:"🍽",c:"#10B981"},
+  "Transporte":{i:"🚗",c:"#F59E0B"},
+  "Personal":{i:"👤",c:"#EC4899"},
+  "Educación/Familia":{i:"👨‍👩‍👧",c:"#14B8A6"},
+  "Entretención":{i:"🎉",c:"#8B5CF6"},
+  "Financiero":{i:"🏦",c:"#F97316"},
+  "Viajes":{i:"✈️",c:"#06B6D4"},
+  "Otros":{i:"📦",c:"#94A3B8"}
+};
 
-// NUEVAS CATEGORÍAS PROFESIONALES
 const CATS = [
   {n:"Arriendo",g:"Vivienda"},{n:"Gas",g:"Vivienda"},{n:"Gastos Comunes",g:"Vivienda"},
   {n:"Supermercado",g:"Alimentación"},{n:"Comida Diaria",g:"Alimentación"},
@@ -29,7 +41,6 @@ const CATS = [
   {n:"Mantención Tarjetas",g:"Financiero"},{n:"Transferencias Varias",g:"Financiero"},
   {n:"Arriendo Viaje",g:"Viajes"},{n:"Otros",g:"Otros"}
 ];
-const catGroup = cat => CATS.find(c=>c.n===cat)?.g||"Otros";
 
 const INIT_DEBTS = [
   {id:"lc",name:"Línea de Crédito",cupo:1000000,usado:0,tasa:2.8},
@@ -48,20 +59,16 @@ const CARDS = ["TC SANT Plat","TC SANT Life","CMR Falabella","TD SANT","Línea C
 const X = {bg:"#0a0b12",card:"rgba(255,255,255,0.03)",bdr:"rgba(255,255,255,0.07)",tx:"#e2e2ec",txD:"rgba(255,255,255,0.35)",txM:"rgba(255,255,255,0.55)",ac:"#E86833",g:"#22C55E",r:"#EF4444",y:"#F59E0B",b:"#3B82F6",p:"#8B5CF6"};
 
 // ══════════════════════════════════════════════════════════════════════
-// UI COMPONENTS
+// COMPONENTES VISUALES
 // ══════════════════════════════════════════════════════════════════════
 const Cd = ({children,s,alert,onClick}) => (
   <div onClick={onClick} style={{background:X.card,border:`1px solid ${alert?X.r:X.bdr}`,borderRadius:16,padding:"18px",position:"relative",overflow:"hidden",...s}}>{children}</div>
 );
 
-const St = ({icon,label,value,color=X.ac,sub}) => (
+const St = ({label,value,color=X.ac}) => (
   <Cd s={{padding:"14px 16px"}}>
-    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-      <span style={{fontSize:16}}>{icon}</span>
-      <span style={{fontSize:10,textTransform:"uppercase",letterSpacing:1.3,color:X.txD,fontWeight:700}}>{label}</span>
-    </div>
+    <div style={{fontSize:10,textTransform:"uppercase",letterSpacing:1.3,color:X.txD,fontWeight:700,marginBottom:6}}>{label}</div>
     <div style={{fontSize:22,fontWeight:800,color,fontFamily:"'JetBrains Mono'",letterSpacing:-0.5}}>{value}</div>
-    {sub&&<div style={{fontSize:11,color:X.txM,marginTop:4,fontWeight:500,whiteSpace:"nowrap"}}>{sub}</div>}
   </Cd>
 );
 
@@ -71,18 +78,23 @@ const Br = ({p,color=X.ac,h=6}) => (
   </div>
 );
 
+const TT = ({active,payload,label}) => {
+  if(!active||!payload?.length)return null;
+  return(<div style={{background:"#14152a",border:`1px solid ${X.bdr}`,borderRadius:10,padding:"8px 12px",fontSize:11}}><div style={{color:X.txD,marginBottom:4}}>{label}</div>{payload.map((p,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:5,color:p.color,marginBottom:2}}><div style={{width:6,height:6,borderRadius:3,background:p.color}}/>{p.name}: {fmt(p.value)}</div>))}</div>);
+};
+
 // ══════════════════════════════════════════════════════════════════════
-// QUICK ENTRY MODAL (AHORA CON INGRESOS Y SWITCH DE MONEDA)
+// PANTALLA DE REGISTRO MODAL (GASTO/PAGO/INGRESO)
 // ══════════════════════════════════════════════════════════════════════
 function QuickEntry({onClose,onSaveExp,onSavePay,onSaveInc,debts,assets}) {
-  const [mode,setMode]=useState("gasto"); // gasto, pago, ingreso
+  const [mode,setMode]=useState("gasto");
   const [amt,setAmt]=useState("");
   const [desc,setDesc]=useState("");
   const [card,setCard]=useState("TC SANT Plat");
   const [cat,setCat]=useState("Otros");
   const [tid,setTid]=useState(debts[0]?.id||"");
   const [aid,setAid]=useState(assets[0]?.id||"");
-  const [cur,setCur]=useState("CLP"); // Moneda CLP o AUD
+  const [cur,setCur]=useState("CLP");
   const ref=useRef(null);
   
   useEffect(()=>{setTimeout(()=>ref.current?.focus(),100)},[]);
@@ -96,7 +108,8 @@ function QuickEntry({onClose,onSaveExp,onSavePay,onSaveInc,debts,assets}) {
     } else if(mode==="ingreso") {
       onSaveInc({id:Date.now(), date:today(), amount:clpAmount, originalAmount:n, currency:cur, assetId:aid, assetName:assets.find(a=>a.id===aid)?.name, desc:desc||"Ingreso"});
     } else {
-      onSaveExp({id:Date.now(), date:today(), amount:clpAmount, originalAmount:n, currency:cur, desc:desc||"Gasto", card, category:cat, group:catGroup(cat)});
+      const g = CATS.find(c=>c.n===cat)?.g || "Otros";
+      onSaveExp({id:Date.now(), date:today(), amount:clpAmount, originalAmount:n, currency:cur, desc:desc||"Gasto", card, category:cat, group:g});
     }
     onClose();
   };
@@ -107,12 +120,11 @@ function QuickEntry({onClose,onSaveExp,onSavePay,onSaveInc,debts,assets}) {
         
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:18}}>
           <div style={{display:"flex",background:"rgba(255,255,255,0.04)",borderRadius:12,padding:2}}>
-            {["gasto","pago","ingreso"].map(k=>(<button key={k} onClick={()=>setMode(k)} style={{padding:"8px 12px",border:"none",borderRadius:10,background:mode===k?X.ac:"transparent",color:"#fff",fontSize:11,fontWeight:700,textTransform:"uppercase"}}>{k=== "ingreso" ? "📥 Ingreso" : k}</button>))}
+            {["gasto","pago","ingreso"].map(k=>(<button key={k} onClick={()=>setMode(k)} style={{padding:"8px 12px",border:"none",borderRadius:10,background:mode===k?X.ac:"transparent",color:"#fff",fontSize:11,fontWeight:700,textTransform:"uppercase"}}>{k==="ingreso"?"📥 INGRESO":k}</button>))}
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",color:X.txD,fontSize:24}}>×</button>
         </div>
 
-        {/* Selector de Moneda */}
         <div style={{display:"flex",gap:8,marginBottom:18}}>
           {["CLP","AUD"].map(c=>(
             <button key={c} onClick={()=>setCur(c)} style={{flex:1,padding:"10px",borderRadius:12,border:`1px solid ${cur===c?X.ac:X.bdr}`,background:cur===c?"rgba(232,104,51,0.1)":"transparent",color:cur===c?X.ac:X.txM,fontSize:12,fontWeight:700}}> {c==="CLP"?"$ CLP":"$ AUD"} </button>
@@ -132,7 +144,9 @@ function QuickEntry({onClose,onSaveExp,onSavePay,onSaveInc,debts,assets}) {
           <>
             <input type="text" placeholder="¿En qué gastaste?" value={desc} onChange={e=>setDesc(e.target.value)} style={{width:"100%",background:X.card,border:`1px solid ${X.bdr}`,borderRadius:14,padding:"14px",color:X.tx,marginBottom:16,outline:"none"}}/>
             <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:16}}>{CARDS.map(c=>(<button key={c} onClick={()=>setCard(c)} style={{background:card===c?X.ac:X.card,border:`1px solid ${card===c?X.ac:X.bdr}`,borderRadius:12,padding:"10px 14px",color:"#fff",fontSize:12,fontWeight:700,whiteSpace:"nowrap"}}>{c}</button>))}</div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{CATS.map(c=>(<button key={c.n} onClick={()=>setCat(c.n)} style={{background:cat===c.n?X.b:X.card,border:`1px solid ${cat===c.n?X.b:X.bdr}`,padding:"6px 12px",borderRadius:20,fontSize:11,color:"#fff"}}>{c.n}</button>))}</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {CATS.map(c=>(<button key={c.n} onClick={()=>setCat(c.n)} style={{background:cat===c.n?X.b:X.card,border:`1px solid ${cat===c.n?X.b:X.bdr}`,padding:"6px 12px",borderRadius:20,fontSize:11,color:"#fff"}}>{c.n}</button>))}
+            </div>
           </>
         )}
 
@@ -152,14 +166,14 @@ function QuickEntry({onClose,onSaveExp,onSavePay,onSaveInc,debts,assets}) {
           </>
         )}
 
-        <button onClick={save} style={{width:"100%",border:"none",borderRadius:16,padding:"16px",fontSize:16,fontWeight:800,background:mode==="pago"||mode==="ingreso"?X.g:X.ac,color:"#fff",marginTop:16}}>GUARDAR</button>
+        <button onClick={save} style={{width:"100%",border:"none",borderRadius:16,padding:"16px",fontSize:16,fontWeight:800,background:mode==="pago"||mode==="ingreso"?X.g:X.ac,color:"#fff",marginTop:16}}>GUARDAR REGISTRO</button>
       </div>
     </div>
   );
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// MAIN APP
+// MAIN APP COMPONENT
 // ══════════════════════════════════════════════════════════════════════
 export default function App() {
   const [view,setView]=useState("home");
@@ -171,78 +185,82 @@ export default function App() {
   const [cm,setCm]=useState(today().slice(0,7));
   const [show,setShow]=useState(false);
   const [synced,setSynced]=useState(false);
-  
   const [dEx,setDEx]=useState(500000);
   const [dSt,setDSt]=useState("avalancha");
 
   const CARD_TO_DEBT = { "TC SANT Plat": "plat", "TC SANT Life": "life", "CMR Falabella": "cmr", "Línea Créd": "lc" };
 
   useEffect(()=>{
-    return onDataChange((data)=>{
-      if(data){
-        setExps(toArray(data.exps));
-        setPays(toArray(data.pays));
-        setDebts(data.debts ? toArray(data.debts) : INIT_DEBTS);
-        setAssets(data.assets ? toArray(data.assets) : INIT_ASSETS);
-        setBud(data.bud || INIT_BUD);
-        setSynced(true);
-      }
-    });
+    try {
+      return onDataChange((data)=>{
+        if(data){
+          setExps(toArray(data.exps));
+          setPays(toArray(data.pays));
+          setDebts(data.debts ? toArray(data.debts) : INIT_DEBTS);
+          setAssets(data.assets ? toArray(data.assets) : INIT_ASSETS);
+          setBud(data.bud || INIT_BUD);
+          setSynced(true);
+        }
+      });
+    } catch(e) { console.error("Error syncing", e); }
   },[]);
+
+  const dispatchUpdate = (nExps, nDebts, nPays, nAssets, nBud) => {
+    setExps(nExps); setDebts(nDebts); setPays(nPays); setAssets(nAssets); setBud(nBud);
+    saveData({exps:nExps, debts:nDebts, pays:nPays, assets:nAssets, bud:nBud});
+  };
 
   const addExp = e => {
     const nExps = [e, ...exps];
     const nDebts = debts.map(d => d.id === CARD_TO_DEBT[e.card] ? {...d, usado: Number(d.usado||0) + Number(e.amount||0)} : d);
-    setExps(nExps); setDebts(nDebts);
-    saveData({exps:nExps, debts:nDebts, pays, assets, bud});
+    dispatchUpdate(nExps, nDebts, pays, assets, bud);
   };
 
   const deleteExp = id => {
     const exp = exps.find(x=>x.id===id); 
-    if(!exp || !window.confirm("¿Eliminar gasto?")) return;
+    if(!exp || !window.confirm("¿Eliminar registro?")) return;
     const nExps = exps.filter(x=>x.id!==id);
     const nDebts = debts.map(d => d.id === CARD_TO_DEBT[exp.card] ? {...d, usado: Math.max(0, (d.usado||0) - (exp.amount||0))} : d);
-    setExps(nExps); setDebts(nDebts);
-    saveData({exps:nExps, debts:nDebts, pays, assets, bud});
+    dispatchUpdate(nExps, nDebts, pays, assets, bud);
   };
 
   const addPay = p => {
     const nPays = [p, ...pays];
     const nDebts = debts.map(d => d.id === p.debtId ? {...d, usado: Math.max(0, (d.usado||0) - (p.amount||0))} : d);
-    setPays(nPays); setDebts(nDebts);
-    saveData({exps, debts:nDebts, pays:nPays, assets, bud});
+    dispatchUpdate(exps, nDebts, nPays, assets, bud);
   };
 
   const addInc = inc => {
-    // Si la cuenta base es AUD y depositan en AUD, suma directo. Si depositan en CLP, lo convertimos a AUD
-    const valToAdd = inc.currency === "AUD" ? inc.originalAmount : Math.round(inc.amount / AUD_CLP);
+    const valToAdd = inc.currency === "AUD" ? (inc.originalAmount||0) : Math.round((inc.amount||0) / AUD_CLP);
     const nAssets = assets.map(a => a.id === inc.assetId ? {...a, balance: Number(a.balance||0) + valToAdd} : a);
-    setAssets(nAssets);
-    saveData({exps, debts, pays, assets:nAssets, bud});
+    dispatchUpdate(exps, debts, pays, nAssets, bud);
   };
 
+  // Matemáticas Seguras
   const mE = useMemo(()=> exps.filter(e => mKey(e.date) === cm), [exps, cm]);
-  const mT = useMemo(()=> mE.reduce((a,e)=>a+(e.amount||0), 0), [mE]);
-  const tD = useMemo(()=> debts.reduce((a,d)=>a+(d.usado||0), 0), [debts]);
-  const tC = useMemo(()=> debts.reduce((a,d)=>a+(d.cupo||0), 0), [debts]);
-  const tB = useMemo(()=> Object.values(bud).reduce((a,v)=>a+(v||0), 0) || 1, [bud]);
+  const mT = useMemo(()=> mE.reduce((a,e)=>a+Number(e.amount||0), 0), [mE]);
+  const tD = useMemo(()=> debts.reduce((a,d)=>a+Number(d.usado||0), 0), [debts]);
+  const tC = useMemo(()=> debts.reduce((a,d)=>a+Number(d.cupo||0), 0), [debts]);
+  const tB = useMemo(()=> Object.values(bud).reduce((a,v)=>a+Number(v||0), 0) || 1, [bud]);
   
-  // Cálculos matemáticos estilo "Tercera Imagen"
   const totInc = Math.round(900 * 4.33 * 625) + 150000;
-  const fxT = 305000; // Fijo Créd+Hna+Cel
+  const fxT = 305000;
   const disp = totInc - fxT;
-  const savAmt = Math.round(disp * 0.15); // Ahorro 15%
-  const pGastar = disp - savAmt;
+  const pGastar = disp - Math.round(disp * 0.15); // Ahorro 15%
   const flujo = pGastar - mT;
+
+  const grp = useMemo(()=>{
+    const g={}; mE.forEach(e => g[e.group] = (g[e.group]||0) + Number(e.amount||0)); return g;
+  },[mE]);
 
   const dPlan = useMemo(() => {
     if (dEx <= 0 || debts.length === 0) return [];
-    let list = debts.map(d=>({...d, bal: d.usado||0, min: Math.max(Math.round((d.usado||0)*0.02), 5000)})).filter(d=>d.bal>0);
-    if(dSt==="avalancha") list.sort((a,b)=>(b.tasa||0) - (a.tasa||0)); else list.sort((a,b)=>(a.bal||0) - (b.bal||0));
+    let list = debts.map(d=>({...d, bal: Number(d.usado||0), min: Math.max(Math.round(Number(d.usado||0)*0.02), 5000)})).filter(d=>d.bal>0);
+    if(dSt==="avalancha") list.sort((a,b)=>Number(b.tasa||0) - Number(a.tasa||0)); else list.sort((a,b)=>Number(a.bal||0) - Number(b.bal||0));
     const tl = []; let mo = 0;
     while(list.some(d=>d.bal>0) && mo < 48) {
       mo++; let ex = dEx;
-      list.forEach(d => { d.bal = Math.round(d.bal * (1 + (d.tasa||0)/100)); const p = Math.min(d.bal, d.min); d.bal -= p; });
+      list.forEach(d => { d.bal = Math.round(d.bal * (1 + Number(d.tasa||0)/100)); const p = Math.min(d.bal, d.min); d.bal -= p; });
       for(const d of list) { if(ex<=0) break; const p = Math.min(d.bal, ex); d.bal -= p; ex -= p; }
       tl.push({ mes: mo, total: list.reduce((a,d)=>a+d.bal,0) });
     }
@@ -252,42 +270,30 @@ export default function App() {
   return(
     <div style={{minHeight:"100vh", background:X.bg, color:X.tx, fontFamily:"sans-serif", paddingBottom:100}}>
       
-      {/* HEADER CENTRADO A 480px */}
+      {/* Header Centrado 480px */}
       <div style={{padding:"20px 18px", maxWidth:480, margin:"0 auto", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
         <h1 style={{fontSize:22, fontWeight:800, color:X.ac}}>Mi Flujo</h1>
         <input type="month" value={cm} onChange={e=>setCm(e.target.value)} style={{background:X.card, border:`1px solid ${X.bdr}`, borderRadius:10, color:"#fff", padding:"6px 12px", colorScheme:"dark"}}/>
       </div>
 
-      {/* CONTENIDO CENTRADO A 480px */}
+      {/* Contenido Central 480px */}
       <div style={{padding:"0 18px", maxWidth:480, margin:"0 auto", display:"flex", flexDirection:"column", gap:16}}>
+        
         {view === "home" && (
           <>
-            {/* Tarjeta de Ingreso exacta a tu maqueta */}
             <Cd s={{background:"linear-gradient(135deg,rgba(34,197,94,0.06),rgba(59,130,246,0.04))"}}>
-              <div style={{fontSize:10, textTransform:"uppercase", letterSpacing:1.5, color:X.txD, fontWeight:700}}>INGRESO MENSUAL (PISO)</div>
+              <div style={{fontSize:10, textTransform:"uppercase", letterSpacing:1.5, color:X.txD, fontWeight:700}}>INGRESO MENSUAL</div>
               <div style={{fontSize:32, fontWeight:800, color:X.g, fontFamily:"'JetBrains Mono'", marginTop:6}}>{fmt(totInc)}</div>
-              <div style={{display:"flex",gap:12,marginTop:10,fontSize:11,color:X.txM}}>
-                <span>🇦🇺 900 AUD/sem → {fmt(Math.round(900*4.33*AUD_CLP))}</span>
-                <span>🇨🇱 {fmt(150000)}</span>
-              </div>
             </Cd>
 
-            {/* Los 3 Bloques exactos a tu maqueta */}
             <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10}}>
-              <St icon="📤" label="Fijo" value="305K" color={X.y} sub="Créd+Hna+Cel"/>
-              <St icon="💰" label="P/Gastar" value={fmtS(pGastar)} color={X.b} sub="Ahorro 15%"/>
-              <St icon={flujo>=0?"✅":"🔴"} label="Flujo" value={fmtS(flujo)} color={flujo>=0?X.g:X.r} sub={flujo<0?"¡Límite!":""}/>
+              <St label="Fijo" value="305K" color={X.y}/>
+              <St label="Gasto" value={fmtS(mT)} color={X.ac}/>
+              <St label="Uso" value={`${pct(tD,tC)}%`} color={X.r}/>
             </div>
 
             <Cd>
-              <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:10}}><span style={{fontSize:13, fontWeight:700, color:X.txM}}>Gasto del Mes</span><span style={{fontSize:22, fontWeight:800}}>{fmt(mT)}</span></div>
-              <Br p={pct(mT, tB)} color={X.ac} h={6}/>
-              <div style={{textAlign:"right",fontSize:10,color:X.txD,marginTop:6}}>{pct(mT,tB)}% de {fmt(tB)}</div>
-            </Cd>
-
-            {/* Nueva Tarjeta de Ahorros CommBank */}
-            <Cd>
-              <h3 style={{fontSize:12, fontWeight:800, margin:"0 0 14px", color:X.txM, textTransform:"uppercase"}}>🏦 Ahorros Australianos</h3>
+              <h3 style={{fontSize:12, fontWeight:800, margin:"0 0 14px", color:X.txM, textTransform:"uppercase"}}>🏦 Ahorros CommBank</h3>
               {assets.map((a,ai)=>(
                 <div key={a.id}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
@@ -297,7 +303,6 @@ export default function App() {
                       <div style={{fontSize:10,color:X.txD}}>≈ {fmt((a.balance||0) * AUD_CLP)} CLP</div>
                     </div>
                   </div>
-                  <input type="number" value={a.balance} onChange={e=>setAssets(prev=>prev.map((x,i)=>i===ai?{...x,balance:Number(e.target.value)}:x))} style={{width:"100%",background:X.bg,border:`1px solid ${X.bdr}`,padding:8,borderRadius:8,color:"#fff",marginTop:10,outline:"none"}} placeholder="Ajustar saldo manual en AUD"/>
                 </div>
               ))}
             </Cd>
@@ -317,7 +322,7 @@ export default function App() {
             </Cd>
 
             <Cd>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><h3 style={{fontSize:12,fontWeight:800,margin:0,color:X.txM,textTransform:"uppercase"}}>Últimos Gastos</h3><button onClick={()=>setView("list")} style={{background:"transparent",border:"none",color:X.ac,fontSize:11,fontWeight:700}}>Ver todo</button></div>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><h3 style={{fontSize:12,fontWeight:800,margin:0,color:X.txM,textTransform:"uppercase"}}>Últimos Movimientos</h3><button onClick={()=>setView("list")} style={{background:"transparent",border:"none",color:X.ac,fontSize:11,fontWeight:700}}>Ver todo →</button></div>
               {mE.slice(0,4).map(e=>(
                 <div key={e.id} style={{display:"flex", justifyContent:"space-between", padding:"10px 0", borderBottom:`1px solid ${X.bdr}`}}>
                   <div><div style={{fontSize:13,fontWeight:700}}>{e.desc}</div><div style={{fontSize:10,color:X.txD}}>{e.card}</div></div>
@@ -331,7 +336,7 @@ export default function App() {
         {view === "list" && (
           <Cd>
             <h3 style={{fontSize:14, marginBottom:16}}>HISTORIAL</h3>
-            {mE.map(e=>(<div key={e.id} style={{display:"flex", justifyContent:"space-between", padding:"12px 0", borderBottom:`1px solid ${X.bdr}`}}>
+            {mE.length===0 ? <p style={{color:X.txD, fontSize:12, textAlign:"center"}}>Sin registros.</p> : mE.map(e=>(<div key={e.id} style={{display:"flex", justifyContent:"space-between", padding:"12px 0", borderBottom:`1px solid ${X.bdr}`}}>
               <div><div style={{fontWeight:700}}>{e.desc}</div><div style={{fontSize:10, color:X.txD}}>{e.currency==="AUD"?`A$${e.originalAmount} · `:""} {e.card}</div></div>
               <div style={{display:"flex", alignItems:"center", gap:10}}><span style={{fontWeight:700}}>{fmt(e.amount)}</span><button onClick={()=>deleteExp(e.id)} style={{color:X.r, background:"none", border:"none", fontSize:18}}>×</button></div>
             </div>))}
@@ -360,13 +365,13 @@ export default function App() {
                 {["avalancha","bola"].map(s=>(<button key={s} onClick={()=>setDSt(s)} style={{flex:1, padding:8, borderRadius:8, background:dSt===s?X.ac:"#1e293b", color:"#fff", border:"none", fontSize:10}}>{s.toUpperCase()}</button>))}
               </div>
             </Cd>
-            <Cd>
-              <ResponsiveContainer width="100%" height={140}>
-                <AreaChart data={dPlan}><Area type="monotone" dataKey="total" stroke={X.r} fill={X.r} fillOpacity={0.1}/></AreaChart>
-              </ResponsiveContainer>
-              <div style={{textAlign:"center", fontWeight:800, color:X.g, marginTop:10}}>¡LIBRE EN {dPlan.length} MESES!</div>
-            </Cd>
-            {debts.map((d,di)=>(<Cd key={d.id} s={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between"}}><span>{d.name}</span><span style={{fontWeight:800, color:X.r}}>{fmt(d.usado)}</span></div><Br p={pct(d.usado,d.cupo)} color={X.r}/><input type="number" value={d.usado} onChange={e=>setDebts(prev=>prev.map((x,i)=>i===di?{...x,usado:Number(e.target.value)}:x))} style={{width:"100%", background:X.bg, border:`1px solid ${X.bdr}`, padding:8, borderRadius:8, color:"#fff", marginTop:10}}/></Cd>))}
+            {dPlan.length>0 && (
+              <Cd>
+                <ResponsiveContainer width="100%" height={140}><AreaChart data={dPlan}><Area type="monotone" dataKey="total" stroke={X.r} fill={X.r} fillOpacity={0.1}/></AreaChart></ResponsiveContainer>
+                <div style={{textAlign:"center", fontWeight:800, color:X.g, marginTop:10}}>¡LIBRE EN {dPlan.length} MESES!</div>
+              </Cd>
+            )}
+            {debts.map((d,di)=>(<Cd key={d.id} s={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between"}}><span>{d.name}</span><span style={{fontWeight:800, color:X.r}}>{fmt(d.usado)}</span></div><Br p={pct(d.usado,d.cupo)} color={X.r}/><input type="number" value={d.usado} onChange={e=>setDebts(prev=>prev.map((x,i)=>i===di?{...x,usado:Number(e.target.value)}:x))} style={{width:"100%", background:X.bg, border:`1px solid ${X.bdr}`, padding:8, borderRadius:8, color:"#fff", marginTop:10, outline:"none"}}/></Cd>))}
           </>
         )}
 
@@ -382,10 +387,8 @@ export default function App() {
         )}
       </div>
 
-      {/* FAB AJUSTADO A 480px */}
       <button onClick={()=>setShow(true)} style={{position:"fixed", bottom:85, right:"max(20px, calc(50vw - 220px))", width:64, height:64, borderRadius:32, background:X.ac, color:"#fff", fontSize:32, border:"none", boxShadow:"0 8px 20px rgba(0,0,0,0.4)", zIndex:100}}>+</button>
 
-      {/* NAV CENTRADO A 480px */}
       <div style={{position:"fixed", bottom:0, left:0, right:0, margin:"0 auto", maxWidth:480, background:"rgba(10,11,18,0.98)", borderTop:`1px solid ${X.bdr}`, display:"flex", padding:"10px 0 20px", zIndex:90}}>
         {[["home","🏠","Inicio"],["list","📋","Gastos"],["budget","🎯","Presup."],["debt","💳","Deudas"],["config","⚙️","Config"]].map(([k,ic,lb])=>(
           <button key={k} onClick={()=>setView(k)} style={{flex:1, background:"none", border:"none", color:view===k?X.ac:X.txD, fontSize:9, display:"flex", flexDirection:"column", alignItems:"center", gap:3}}>
