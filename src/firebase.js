@@ -14,31 +14,36 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// Variable global para evitar procesar el mismo gasto dos veces en la misma sesión
+let lastProcessedExpenseId = null;
+
 export const saveData = async (newData) => {
   try {
     const docRef = doc(db, "users", "mainData");
 
-    // LÓGICA DE AUTO-SUMA:
-    if (newData.exps && newData.debts) {
+    if (newData.exps && newData.exps.length > 0 && newData.debts) {
       const lastExp = newData.exps[newData.exps.length - 1];
-      const montoGasto = Number(lastExp.amount || lastExp.originalAmount || 0);
       
-      // Obtenemos el nombre de la tarjeta del gasto y lo limpiamos
-      const tarjetaDelGasto = String(lastExp.card || "").trim();
+      // SOLO procesamos si el ID del gasto es diferente al último que procesamos
+      if (lastExp.id !== lastProcessedExpenseId) {
+        const montoGasto = Number(lastExp.amount || lastExp.originalAmount || 0);
+        const tarjetaDelGasto = String(lastExp.card || "").trim();
 
-      if (montoGasto > 0 && tarjetaDelGasto !== "") {
-        newData.debts = newData.debts.map(debt => {
-          // Comparamos ignorando mayúsculas/minúsculas y puntos extra
-          const nombreD = String(debt.name || "").trim();
-          const idD = String(debt.id || "").trim();
+        if (montoGasto > 0 && tarjetaDelGasto !== "") {
+          newData.debts = newData.debts.map(debt => {
+            const nombreD = String(debt.name || "").trim();
+            const idD = String(debt.id || "").trim();
 
-          if (nombreD === tarjetaDelGasto || idD === tarjetaDelGasto) {
-            const saldoAnterior = Number(debt.usado) || 0;
-            // IMPORTANTE: Sumamos el gasto al saldo usado
-            return { ...debt, usado: saldoAnterior + montoGasto };
-          }
-          return debt;
-        });
+            if (nombreD === tarjetaDelGasto || idD === tarjetaDelGasto) {
+              const saldoAnterior = Number(debt.usado) || 0;
+              return { ...debt, usado: saldoAnterior + montoGasto };
+            }
+            return debt;
+          });
+          
+          // Marcamos este gasto como "ya procesado"
+          lastProcessedExpenseId = lastExp.id;
+        }
       }
     }
 
