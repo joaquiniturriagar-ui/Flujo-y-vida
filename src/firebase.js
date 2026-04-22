@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, onSnapshot } from "firebase/firestore";
+import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBh9x8JiPrOKmaenMzLl31D1Qvd446XQFA",
@@ -11,22 +11,44 @@ const firebaseConfig = {
   appId: "1:655957911597:web:81deebf9b78ae25580b0a4"
 };
 
-// Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// --- FUNCIONES QUE TU APP ESTÁ BUSCANDO ---
-
-// Función para guardar datos
-export const saveData = async (data) => {
+// Función mejorada con "Auto-Suma" de deudas
+export const saveData = async (newData) => {
   try {
-    await setDoc(doc(db, "users", "mainData"), data);
+    const docRef = doc(db, "users", "mainData");
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const oldData = docSnap.data();
+      
+      // 1. Detectar si hay un gasto nuevo comparando las listas
+      if (newData.exps && newData.exps.length > (oldData.exps?.length || 0)) {
+        const lastExpense = newData.exps[newData.exps.length - 1];
+        
+        // 2. Si el gasto tiene una tarjeta asignada, actualizar el saldo 'usado'
+        if (lastExpense.card && newData.debts) {
+          newData.debts = newData.debts.map(debt => {
+            // Comparamos por ID o por Name para asegurar el "match"
+            if (debt.id === lastExpense.card || debt.name === lastExpense.card) {
+              const currentUsado = Number(debt.usado) || 0;
+              const expenseAmount = Number(lastExpense.amount) || 0;
+              return { ...debt, usado: currentUsado + expenseAmount };
+            }
+            return debt;
+          });
+        }
+      }
+    }
+
+    // 3. Guardar los datos ya actualizados
+    await setDoc(docRef, newData);
   } catch (e) {
-    console.error("Error guardando datos: ", e);
+    console.error("Error guardando datos con auto-suma: ", e);
   }
 };
 
-// Función para escuchar cambios en tiempo real
 export const onDataChange = (callback) => {
   return onSnapshot(doc(db, "users", "mainData"), (doc) => {
     callback(doc.data());
