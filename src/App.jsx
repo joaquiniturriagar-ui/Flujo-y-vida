@@ -16,14 +16,61 @@ const AUD_CLP = 625;
 // BLINDAJE CONTRA FIREBASE: Fuerza a que todo sea un Array
 const toArray = (data) => Array.isArray(data) ? data : Object.values(data || {});
 
-const GROUPS = {"Vivienda":{i:"🏠",c:"#3B82F6"},"Alimentación":{i:"🍽",c:"#10B981"},"Transporte":{i:"🚗",c:"#F59E0B"},"Entretención":{i:"🎉",c:"#8B5CF6"},"Personal":{i:"👤",c:"#EC4899"},"Familia":{i:"👨‍👩‍👧",c:"#14B8A6"},"Financiero":{i:"🏦",c:"#F97316"},"Viajes":{i:"✈️",c:"#06B6D4"},"Otros":{i:"📦",c:"#94A3B8"}};
+const GROUPS = {
+  "Vivienda":{i:"🏠",c:"#3B82F6"},
+  "Alimentación":{i:"🍽",c:"#10B981"},
+  "Transporte":{i:"🚗",c:"#F59E0B"},
+  "Personal":{i:"👤",c:"#EC4899"},
+  "Educación/Familia":{i:"👨‍👩‍👧",c:"#14B8A6"},
+  "Entretención":{i:"🎉",c:"#8B5CF6"},
+  "Financiero":{i:"🏦",c:"#F97316"},
+  "Viajes":{i:"✈️",c:"#06B6D4"},
+  "Otros":{i:"📦",c:"#94A3B8"}
+};
 
+// CATEGORÍAS EXACTAS SEGÚN TU IMAGEN
 const CATS = [
-  {n:"Arriendo",g:"Vivienda"},{n:"Gastos Comunes",g:"Vivienda"},{n:"Servicios",g:"Vivienda"},
-  {n:"Supermercado",g:"Alimentación"},{n:"Comida Diaria",g:"Alimentación"},
-  {n:"Bencina",g:"Transporte"},{n:"Cuota Auto",g:"Transporte"},{n:"Seguro Auto",g:"Transporte"},{n:"Movilización",g:"Transporte"},
-  {n:"Restoranes/Salidas",g:"Entretención"},{n:"Cervezas/Copas",g:"Entretención"},{n:"Otros",g:"Otros"},
+  {n:"Arriendo", g:"Vivienda"},
+  {n:"Gas", g:"Vivienda"},
+  {n:"Gym", g:"Entretención"},
+  {n:"Gastos Comunes", g:"Vivienda"},
+  {n:"Comida General", g:"Alimentación"},
+  {n:"Cuota Colegio", g:"Educación/Familia"},
+  {n:"Auto Bencina", g:"Transporte"},
+  {n:"Autoseguro", g:"Transporte"},
+  {n:"Auto Cuota", g:"Transporte"},
+  {n:"Auto Mantencion", g:"Transporte"},
+  {n:"Celular", g:"Personal"},
+  {n:"Arriendo Viaje", g:"Viajes"},
+  {n:"Gastos Propios", g:"Personal"},
+  {n:"Farmacia", g:"Personal"},
+  {n:"Ropa", g:"Personal"},
+  {n:"Retiro Cajero", g:"Personal"},
+  {n:"Movilizacion / Pasajes", g:"Transporte"},
+  {n:"Recreacion / Ocio", g:"Entretención"},
+  {n:"Mantención Tarjetas", g:"Financiero"},
+  {n:"Transferencias Varias / Deudas", g:"Financiero"},
+  {n:"Aplicaciones", g:"Personal"},
+  {n:"Otros", g:"Otros"}
 ];
+
+const RULES = [
+  {kw:["arriendo","rent"],cat:"Arriendo"},{kw:["gastos comunes","ggcc"],cat:"Gastos Comunes"},{kw:["gas ","luz ","agua ","leña"],cat:"Gas"},
+  {kw:["lider","jumbo","santa isabel","super","mercado","coles","woolworth","comida","almuerzo","desayuno","sushi","pizza"],cat:"Comida General"},
+  {kw:["bencina","petrobras","shell","copec","peaje"],cat:"Auto Bencina"},{kw:["cuota auto","credito auto"],cat:"Auto Cuota"},{kw:["seguro auto"],cat:"Autoseguro"},
+  {kw:["mecanic","repuesto","bateria","mantencion","lavado"],cat:"Auto Mantencion"},
+  {kw:["uber","metro","bus","pasaje","transfer","taxi","didi"],cat:"Movilizacion / Pasajes"},
+  {kw:["restoran","bar ","cafe","cerveza","copete","cine","salida"],cat:"Recreacion / Ocio"},
+  {kw:["gym","gimnasio","surfit"],cat:"Gym"},
+  {kw:["farmacia","cruz verde","salcobrand","remedio","dentista"],cat:"Farmacia"},
+  {kw:["celular","entel","movistar","felix"],cat:"Celular"},
+  {kw:["ropa","zapato","zapatilla","polera","bolso"],cat:"Ropa"},
+  {kw:["colegio","matricula","cuota col"],cat:"Cuota Colegio"},
+  {kw:["netflix","spotify","apple","google","suscripcion","app"],cat:"Aplicaciones"},
+  {kw:["mantencion tc","comision","iva"],cat:"Mantención Tarjetas"},
+  {kw:["hotel","airbnb","alojamiento"],cat:"Arriendo Viaje"}
+];
+const autocat = (desc,custom=[]) => { const d=desc.toLowerCase().trim(); for(const r of custom)if(r.kw.some(k=>d.includes(k.toLowerCase())))return r.cat; for(const r of RULES)if(r.kw.some(k=>d.includes(k)))return r.cat; return null; };
 
 const INIT_DEBTS = [
   {id:"lc",name:"Línea de Crédito",cupo:1000000,usado:0,tasa:2.8},
@@ -32,7 +79,7 @@ const INIT_DEBTS = [
   {id:"cmr",name:"CMR Falabella",cupo:390000,usado:0,tasa:3.5},
 ];
 
-const INIT_BUD = {"Vivienda":250000,"Alimentación":300000,"Transporte":200000,"Entretención":200000,"Personal":150000,"Familia":120000,"Financiero":80000,"Viajes":0,"Otros":50000};
+const INIT_BUD = {"Vivienda":250000,"Alimentación":300000,"Transporte":200000,"Entretención":200000,"Personal":150000,"Educación/Familia":120000,"Financiero":80000,"Viajes":0,"Otros":50000};
 const CARDS = ["TC SANT Plat","TC SANT Life","CMR Falabella","TD SANT","Línea Créd","Efectivo","CommBank AUS"];
 
 const X = {bg:"#0a0b12",card:"rgba(255,255,255,0.03)",bdr:"rgba(255,255,255,0.07)",tx:"#e2e2ec",txD:"rgba(255,255,255,0.35)",txM:"rgba(255,255,255,0.55)",ac:"#E86833",g:"#22C55E",r:"#EF4444",y:"#F59E0B",b:"#3B82F6",p:"#8B5CF6"};
@@ -61,18 +108,8 @@ const Br = ({p,color=X.ac,h=5}) => (
   </div>
 );
 
-const TT = ({active,payload,label}) => {
-  if(!active||!payload?.length)return null;
-  return(<div style={{background:"#14152a",border:`1px solid ${X.bdr}`,borderRadius:10,padding:"8px 12px",fontSize:11}}>
-    <div style={{color:X.txD,marginBottom:4}}>{label}</div>
-    {payload.map((p,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:5,color:p.color,marginBottom:2}}>
-      <div style={{width:6,height:6,borderRadius:3,background:p.color}}/>{p.name}: {fmt(p.value)}
-    </div>))}
-  </div>);
-};
-
 // ══════════════════════════════════════════════════════════════════════
-// QUICK ENTRY MODAL
+// QUICK ENTRY MODAL (CONVERSIÓN AUD Y TODAS LAS CATEGORÍAS)
 // ══════════════════════════════════════════════════════════════════════
 function QuickEntry({onClose,onSaveExp,onSavePay,debts}) {
   const [mode,setMode]=useState("gasto");
@@ -81,44 +118,68 @@ function QuickEntry({onClose,onSaveExp,onSavePay,debts}) {
   const [card,setCard]=useState("TC SANT Plat");
   const [cat,setCat]=useState("Otros");
   const [tid,setTid]=useState(debts[0]?.id||"");
+  const [cur,setCur]=useState("CLP");
   const ref=useRef(null);
+  
   useEffect(()=>{setTimeout(()=>ref.current?.focus(),100)},[]);
 
   const save=()=>{
     const n=parseInt(amt.replace(/\D/g,""),10); if(!n) return;
+    const clpAmount = cur === "AUD" ? Math.round(n * AUD_CLP) : n;
+
     if(mode==="pago"){
-      onSavePay({id:Date.now(), date:today(), amount:n, debtId:tid, debtName:debts.find(d=>d.id===tid)?.name, desc:desc||"Pago Deuda"});
+      onSavePay({id:Date.now(), date:today(), amount:clpAmount, originalAmount:n, currency:cur, debtId:tid, debtName:debts.find(d=>d.id===tid)?.name, desc:desc||"Pago Deuda"});
     } else {
-      onSaveExp({id:Date.now(), date:today(), amount:n, desc:desc||"Gasto", card, category:cat, group:CATS.find(c=>c.n===cat)?.g || "Otros"});
+      onSaveExp({id:Date.now(), date:today(), amount:clpAmount, originalAmount:n, currency:cur, desc:desc||"Gasto", card, category:cat, group:CATS.find(c=>c.n===cat)?.g || "Otros"});
     }
     onClose();
   };
 
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(8px)"}}>
-      <div style={{background:"#14152a",width:"100%",maxWidth:480,borderRadius:"24px 24px 0 0",padding:"20px 18px 32px"}}>
+      <div style={{background:"#14152a",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",borderRadius:"24px 24px 0 0",padding:"20px 18px 32px"}}>
+        
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:18}}>
           <div style={{display:"flex",background:"rgba(255,255,255,0.04)",borderRadius:12,padding:2}}>
             {["gasto","pago"].map(k=>(<button key={k} onClick={()=>setMode(k)} style={{padding:"8px 16px",border:"none",borderRadius:10,background:mode===k?X.ac:"transparent",color:"#fff",fontSize:12,fontWeight:700}}>{k.toUpperCase()}</button>))}
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",color:X.txD,fontSize:24}}>×</button>
         </div>
-        <div style={{textAlign:"center",marginBottom:20}}>
-          <input ref={ref} type="text" inputMode="numeric" placeholder="$ 0" value={amt?parseInt(amt.replace(/\D/g,"")).toLocaleString("es-CL"):""} onChange={e=>setAmt(e.target.value.replace(/\./g,""))}
-            style={{background:"transparent",border:"none",color:X.tx,fontSize:42,fontWeight:800,fontFamily:"'JetBrains Mono'",outline:"none",textAlign:"center",width:"100%"}}/>
+
+        {/* Currency Toggle */}
+        <div style={{display:"flex",gap:8,marginBottom:18}}>
+          {["CLP","AUD"].map(c=>(
+            <button key={c} onClick={()=>setCur(c)} style={{flex:1,padding:"8px",borderRadius:10,border:`1px solid ${cur===c?X.ac:X.bdr}`,background:cur===c?"rgba(232,104,51,0.1)":"transparent",color:cur===c?X.ac:X.txM,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+              {c==="CLP"?"$ CLP":"$ AUD"}
+            </button>
+          ))}
         </div>
+
+        <div style={{textAlign:"center",marginBottom:20}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            <span style={{fontSize:32,fontWeight:800,color:mode==="pago"?X.g:X.ac,fontFamily:"'JetBrains Mono'"}}>{cur==="AUD"?"A$":"$"}</span>
+            <input ref={ref} type="text" inputMode="numeric" placeholder="0" value={amt?parseInt(amt.replace(/\D/g,"")).toLocaleString("es-CL"):""} onChange={e=>setAmt(e.target.value.replace(/\./g,""))}
+              style={{background:"transparent",border:"none",color:X.tx,fontSize:42,fontWeight:800,fontFamily:"'JetBrains Mono'",outline:"none",textAlign:"center",width:"180px"}}/>
+          </div>
+          {cur==="AUD"&&amt&&<div style={{fontSize:12,color:X.txD,marginTop:4}}>≈ {fmt(parseInt(amt.replace(/\D/g,""),10)*AUD_CLP)} CLP</div>}
+        </div>
+
         {mode==="gasto" ? (
           <>
             <input type="text" placeholder="¿En qué gastaste?" value={desc} onChange={e=>setDesc(e.target.value)} style={{width:"100%",background:X.card,border:`1px solid ${X.bdr}`,borderRadius:14,padding:"14px",color:X.tx,marginBottom:16,outline:"none"}}/>
             <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:16}}>{CARDS.map(c=>(<button key={c} onClick={()=>setCard(c)} style={{background:card===c?X.ac:X.card,border:`1px solid ${card===c?X.ac:X.bdr}`,borderRadius:12,padding:"10px 14px",color:"#fff",fontSize:12,fontWeight:700,whiteSpace:"nowrap"}}>{c}</button>))}</div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{CATS.slice(0,10).map(c=>(<button key={c.n} onClick={()=>setCat(c.n)} style={{background:cat===c.n?X.b:X.card,border:`1px solid ${cat===c.n?X.b:X.bdr}`,padding:"6px 12px",borderRadius:20,fontSize:11,color:"#fff"}}>{c.n}</button>))}</div>
+            
+            {/* Todas las categorías (Flex Wrap) */}
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {CATS.map(c=>(<button key={c.n} onClick={()=>setCat(c.n)} style={{background:cat===c.n?X.b:X.card,border:`1px solid ${cat===c.n?X.b:X.bdr}`,padding:"6px 12px",borderRadius:20,fontSize:11,color:"#fff"}}>{c.n}</button>))}
+            </div>
           </>
         ) : (
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
             {debts.map(d=>(<button key={d.id} onClick={()=>setTid(d.id)} style={{background:tid===d.id?`${X.g}22`:X.card,border:`1px solid ${tid===d.id?X.g:X.bdr}`,borderRadius:12,padding:"12px",color:"#fff",textAlign:"left"}}>{d.name}</button>))}
           </div>
         )}
-        <button onClick={save} style={{width:"100%",border:"none",borderRadius:16,padding:"16px",fontSize:16,fontWeight:800,background:mode==="pago"?X.g:X.ac,color:"#fff",marginTop:16}}>GUARDAR</button>
+        <button onClick={save} style={{width:"100%",border:"none",borderRadius:16,padding:"16px",fontSize:16,fontWeight:800,background:mode==="pago"?X.g:X.ac,color:"#fff",marginTop:20}}>GUARDAR</button>
       </div>
     </div>
   );
@@ -136,7 +197,6 @@ export default function App() {
   const [cm,setCm]=useState(today().slice(0,7));
   const [show,setShow]=useState(false);
   const [synced,setSynced]=useState(false);
-  
   const [dEx,setDEx]=useState(500000);
   const [dSt,setDSt]=useState("avalancha");
 
@@ -202,13 +262,11 @@ export default function App() {
   return(
     <div style={{minHeight:"100vh", background:X.bg, color:X.tx, fontFamily:"sans-serif", paddingBottom:100}}>
       
-      {/* HEADER CENTRADO A 480px */}
       <div style={{padding:"20px 18px", maxWidth:480, margin:"0 auto", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
         <h1 style={{fontSize:22, fontWeight:800, color:X.ac}}>Mi Flujo</h1>
         <input type="month" value={cm} onChange={e=>setCm(e.target.value)} style={{background:X.card, border:`1px solid ${X.bdr}`, borderRadius:10, color:"#fff", padding:"5px 10px", colorScheme:"dark"}}/>
       </div>
 
-      {/* CONTENIDO CENTRADO A 480px */}
       <div style={{padding:"0 18px", maxWidth:480, margin:"0 auto", display:"flex", flexDirection:"column", gap:16}}>
         {view === "home" && (
           <>
@@ -241,7 +299,7 @@ export default function App() {
           <Cd>
             <h3 style={{fontSize:14, marginBottom:16}}>HISTORIAL</h3>
             {mE.map(e=>(<div key={e.id} style={{display:"flex", justifyContent:"space-between", padding:"12px 0", borderBottom:`1px solid ${X.bdr}`}}>
-              <div><div style={{fontWeight:700}}>{e.desc}</div><div style={{fontSize:10, color:X.txD}}>{e.card}</div></div>
+              <div><div style={{fontWeight:700}}>{e.desc}</div><div style={{fontSize:10, color:X.txD}}>{e.currency==="AUD"?`A$${e.originalAmount}`:""} {e.card}</div></div>
               <div style={{display:"flex", alignItems:"center", gap:10}}><span style={{fontWeight:700}}>{fmt(e.amount)}</span><button onClick={()=>deleteExp(e.id)} style={{color:X.r, background:"none", border:"none", fontSize:18}}>×</button></div>
             </div>))}
           </Cd>
@@ -291,10 +349,8 @@ export default function App() {
         )}
       </div>
 
-      {/* FAB AJUSTADO A 480px */}
       <button onClick={()=>setShow(true)} style={{position:"fixed", bottom:85, right:"max(20px, calc(50vw - 220px))", width:64, height:64, borderRadius:32, background:X.ac, color:"#fff", fontSize:32, border:"none", boxShadow:"0 8px 20px rgba(0,0,0,0.4)", zIndex:100}}>+</button>
 
-      {/* NAV CENTRADO A 480px */}
       <div style={{position:"fixed", bottom:0, left:0, right:0, margin:"0 auto", maxWidth:480, background:"rgba(10,11,18,0.98)", borderTop:`1px solid ${X.bdr}`, display:"flex", padding:"10px 0 20px", zIndex:90}}>
         {[["home","🏠","Inicio"],["list","📋","Gastos"],["budget","🎯","Presup."],["debt","💳","Deudas"],["config","⚙️","Config"]].map(([k,ic,lb])=>(
           <button key={k} onClick={()=>setView(k)} style={{flex:1, background:"none", border:"none", color:view===k?X.ac:X.txD, fontSize:9, display:"flex", flexDirection:"column", alignItems:"center", gap:3}}>
