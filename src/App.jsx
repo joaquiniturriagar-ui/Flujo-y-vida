@@ -263,12 +263,55 @@ export default function App() {
     }, 800);
   },[exps,pays,rules,bud,debts,savPct]);
 
-  useEffect(()=>{if(synced)doSave();},[exps,pays,rules,bud,debts,savPct]);
+// ── Mapeo de Tarjeta -> ID de Deuda ──
+  const CARD_TO_DEBT = {
+    "TC SANT Plat": "plat",
+    "TC SANT Life": "life",
+    "CMR Falabella": "cmr",
+    "Línea Créd": "lc"
+  };
 
-  // ── Actions ──
-  const addExp=e=>{
-    setExps(p=>[e,...p]);
-    const s=autocat(e.desc,rules);
+  // ── Función para Agregar Gasto (Actualiza Deuda) ──
+  const addExp = e => {
+    // 1. Guardar gasto
+    setExps(p => [e, ...p]);
+
+    // 2. Actualizar Deuda si corresponde
+    const debtId = CARD_TO_DEBT[e.card];
+    if (debtId) {
+      setDebts(prev => prev.map(d => 
+        d.id === debtId ? { ...d, usado: Number(d.usado) + Number(e.amount) } : d
+      ));
+    }
+
+    // 3. Reglas de auto-categorización
+    const s = autocat(e.desc, rules);
+    if (s !== e.category) {
+      const w = e.desc.toLowerCase().trim().split(/\s+/)[0];
+      if (w && w.length >= 3 && !rules.some(r => r.kw.includes(w) && r.cat === e.category)) {
+        setRules(p => [...p, { kw: [w], cat: e.category }]);
+      }
+    }
+  };
+
+  // ── Función para Eliminar Gasto (Resta de la Deuda) ──
+  const deleteExp = (id) => {
+    const expToDelete = exps.find(e => e.id === id);
+    if (!expToDelete) return;
+
+    if (confirm("¿Eliminar este gasto?")) {
+      // 1. Quitar de la lista
+      setExps(p => p.filter(x => x.id !== id));
+
+      // 2. Restar de la deuda si era tarjeta
+      const debtId = CARD_TO_DEBT[expToDelete.card];
+      if (debtId) {
+        setDebts(prev => prev.map(d => 
+          d.id === debtId ? { ...d, usado: Math.max(0, Number(d.usado) - Number(expToDelete.amount)) } : d
+        ));
+      }
+    }
+  };
     if(s!==e.category){const w=e.desc.toLowerCase().trim().split(/\s+/)[0];if(w&&w.length>=3&&!rules.some(r=>r.kw.includes(w)&&r.cat===e.category))setRules(p=>[...p,{kw:[w],cat:e.category}]);}
   };
   const addPay=p=>{setPays(prev=>[p,...prev]);setDebts(prev=>prev.map(d=>d.id===p.debtId?{...d,usado:Math.max(0,d.usado-p.amount)}:d));};
