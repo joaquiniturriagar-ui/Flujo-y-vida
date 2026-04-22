@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, ReferenceLine } from "recharts";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis } from "recharts";
 import { saveData, onDataChange } from "./firebase";
 
 // ══════════════════════════════════════════════════════════════════════
@@ -38,8 +38,8 @@ const RULES = [
   {kw:["bencina","petrobras","shell","copec","peaje"],cat:"Bencina"},{kw:["cuota auto","credito auto"],cat:"Cuota Auto"},{kw:["seguro auto","permiso circ"],cat:"Seguro Auto"},
   {kw:["revision tec","mecanic","repuesto","bateria","cambio aceite","mantencion auto","balanceo","lavado","repco","disco"],cat:"Mantención Auto"},
   {kw:["uber","metro","bus","pasaje","transfer","transvip","grab","taxi","didi"],cat:"Movilización"},
-  {kw:["cerveza","cerv","chela","copete","pisco","vino","gin","botiller"],cat:"Cervezas/Copas"},
   {kw:["restoran","gaucha","rolling","tropera","chalota","canalla","salmon","rails","bar ","cafe","café","starbuck","rappi","pedidos ya","subway","mcdonald","kfc","bagual"],cat:"Restoranes/Salidas"},
+  {kw:["cerveza","cerv","chela","copete","pisco","vino","gin","botiller"],cat:"Cervezas/Copas"},
   {kw:["gym","gimnasio","surfit","rebox"],cat:"Gimnasio"},{kw:["cine","entrada","museo"],cat:"Recreación"},
   {kw:["farmacia","cruz verde","salcobrand","remedio","dentista","consulta"],cat:"Farmacia"},
   {kw:["celular","felix","entel","movistar"],cat:"Celular"},
@@ -51,16 +51,17 @@ const RULES = [
   {kw:["pago tarj"],cat:"Pago Tarjeta"},
   {kw:["hotel","hostal","aloj","airbnb"],cat:"Alojamiento"},{kw:["vuelo","avion","aerop","flight"],cat:"Pasajes"},
 ];
+
 const autocat = (desc,custom=[]) => { const d=desc.toLowerCase().trim(); for(const r of custom)if(r.kw.some(k=>d.includes(k.toLowerCase())))return r.cat; for(const r of RULES)if(r.kw.some(k=>d.includes(k)))return r.cat; return null; };
 
 // ══════════════════════════════════════════════════════════════════════
 // DEFAULTS
 // ══════════════════════════════════════════════════════════════════════
 const INIT_DEBTS = [
-  {id:"lc",name:"Línea de Crédito",cupo:1000000,usado:1000000,tasa:2.8},
-  {id:"plat",name:"TC Santander Plat.",cupo:4000000,usado:2310740,tasa:3.2},
-  {id:"life",name:"TC Santander Life",cupo:1700000,usado:740054,tasa:3.2},
-  {id:"cmr",name:"CMR Falabella",cupo:390000,usado:383223,tasa:3.5},
+  {id:"lc",name:"Línea de Crédito",cupo:1000000,usado:0,tasa:2.8},
+  {id:"plat",name:"TC Santander Plat.",cupo:4000000,usado:0,tasa:3.2},
+  {id:"life",name:"TC Santander Life",cupo:1700000,usado:0,tasa:3.2},
+  {id:"cmr",name:"CMR Falabella",cupo:390000,usado:0,tasa:3.5},
 ];
 const INIT_BUD = {"Vivienda":250000,"Alimentación":300000,"Transporte":200000,"Entretención":200000,"Personal":150000,"Familia":120000,"Financiero":80000,"Viajes":0,"Otros":50000};
 const CARDS = ["TC SANT Plat","TC SANT Life","CMR Falabella","TD SANT","Línea Créd","Efectivo","CommBank AUS"];
@@ -88,7 +89,7 @@ const St = ({icon,label,value,color=X.ac,sub}) => (
       <span style={{fontSize:9,textTransform:"uppercase",letterSpacing:1.3,color:X.txD,fontWeight:600}}>{label}</span>
     </div>
     <div style={{fontSize:20,fontWeight:700,color,fontFamily:"'JetBrains Mono',monospace",letterSpacing:-0.3}}>{value}</div>
-    {sub&&<div style={{fontSize:10,color:X.txD,marginTop:2}}>{sub}</div>}
+    {sub&&<div style={{fontSize:10,color:X.txD,marginTop:2,whiteSpace:"nowrap",overflow:"hidden"}}>{sub}</div>}
   </Cd>
 );
 
@@ -109,7 +110,7 @@ const TT = ({active,payload,label}) => {
 };
 
 // ══════════════════════════════════════════════════════════════════════
-// QUICK ENTRY
+// QUICK ENTRY (POLISHED)
 // ══════════════════════════════════════════════════════════════════════
 function QuickEntry({onClose,onSaveExp,onSavePay,expenses,custom,debts}) {
   const [mode,setMode]=useState("gasto");
@@ -124,7 +125,7 @@ function QuickEntry({onClose,onSaveExp,onSavePay,expenses,custom,debts}) {
   const ref=useRef(null);
 
   useEffect(()=>{setTimeout(()=>ref.current?.focus(),100)},[]);
-  useEffect(()=>{if(mode==="gasto"){const s=autocat(desc,custom);setSug(s);if(s&&!cat)setCat(s);}},[desc, custom, cat, mode]);
+  useEffect(()=>{if(mode==="gasto"){const s=autocat(desc,custom);setSug(s);if(s&&!cat)setCat(s);}},[desc]);
 
   const ac=useMemo(()=>{
     if(desc.length<2||mode==="pago")return[];
@@ -138,7 +139,7 @@ function QuickEntry({onClose,onSaveExp,onSavePay,expenses,custom,debts}) {
     if(mode==="pago"){
       onSavePay({id:Date.now()+Math.random().toString(36).slice(2),date,amount:clp,originalAmount:n,currency:cur,debtId:tid,debtName:debts.find(d=>d.id===tid)?.name||"",desc:desc.trim()||`Pago ${debts.find(d=>d.id===tid)?.name||""}`});
     } else {
-      if(!desc.trim())return;
+      if(!desc.trim()) return;
       onSaveExp({id:Date.now()+Math.random().toString(36).slice(2),date,amount:clp,originalAmount:n,currency:cur,desc:desc.trim(),card,category:cat||"Otros",group:catGroup(cat||"Otros")});
     }
     onClose();
@@ -147,54 +148,71 @@ function QuickEntry({onClose,onSaveExp,onSavePay,expenses,custom,debts}) {
   const fa=v=>{const n=v.replace(/\D/g,"");return n?parseInt(n,10).toLocaleString("es-CL").replace(/,/g,"."):"";};
 
   return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center", backdropFilter: "blur(4px)"}}>
       <style>{`@keyframes su{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
-      <div style={{background:"#14152a",width:"100%",maxWidth:480,maxHeight:"94vh",overflowY:"auto",borderRadius:"20px 20px 0 0",padding:"20px 18px 32px",animation:"su 0.2s ease"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-          <div style={{display:"flex",background:"rgba(255,255,255,0.04)",borderRadius:10,overflow:"hidden",border:`1px solid ${X.bdr}`}}>
-            {[["gasto","💸 Gasto"],["pago","💳 Pago Deuda"]].map(([k,l])=>(
-              <button key={k} onClick={()=>{setMode(k);setAmt("");setDesc("");}} style={{padding:"9px 16px",border:"none",background:mode===k?"rgba(232,104,51,0.15)":"transparent",color:mode===k?X.ac:X.txM,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>{l}</button>
+      <div style={{background:"#14152a",width:"100%",maxWidth:480,maxHeight:"94vh",overflowY:"auto",borderRadius:"24px 24px 0 0",padding:"20px 18px 32px",animation:"su 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)"}}>
+
+        {/* Toggle Mode */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+          <div style={{display:"flex",background:"rgba(255,255,255,0.04)",borderRadius:12,padding:2,border:`1px solid ${X.bdr}`}}>
+            {[["gasto","💸 Gasto"],["pago","💳 Pago"]].map(([k,l])=>(
+              <button key={k} onClick={()=>setMode(k)} style={{padding:"8px 16px",border:"none",borderRadius:10,background:mode===k?X.ac:"transparent",color:mode===k?"#fff":X.txM,fontSize:12,fontWeight:700,cursor:"pointer",transition:"0.2s"}}>{l}</button>
             ))}
           </div>
-          <button onClick={onClose} style={{background:"transparent",border:"none",color:X.txD,fontSize:22,cursor:"pointer"}}>×</button>
+          <button onClick={onClose} style={{background:X.card,border:`1px solid ${X.bdr}`,borderRadius:"50%",width:32,height:32,color:X.txD,fontSize:20,cursor:"pointer"}}>×</button>
         </div>
-        <div style={{display:"flex",gap:6,marginBottom:14}}>
+
+        {/* Currency Switch */}
+        <div style={{display:"flex",gap:8,marginBottom:18}}>
           {["CLP","AUD"].map(c=>(
-            <button key={c} onClick={()=>setCur(c)} style={{flex:1,padding:"7px",borderRadius:10,border:`1px solid ${cur===c?"rgba(232,104,51,0.4)":X.bdr}`,background:cur===c?"rgba(232,104,51,0.1)":"transparent",color:cur===c?X.ac:X.txM,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>{c==="CLP"?"$ CLP":"$ AUD"}</button>
+            <button key={c} onClick={()=>setCur(c)} style={{flex:1,padding:"10px",borderRadius:12,border:`1px solid ${cur===c?X.ac:X.bdr}`,background:cur===c?"rgba(232,104,51,0.1)":"transparent",color:cur===c?X.ac:X.txM,fontSize:12,fontWeight:700,cursor:"pointer"}}> {c==="CLP"?"$ CLP":"$ AUD"} </button>
           ))}
         </div>
-        <div style={{marginBottom:14}}>
-          <div style={{display:"flex",alignItems:"center",gap:6}}>
-            <span style={{fontSize:28,fontWeight:700,color:mode==="pago"?X.g:X.ac,fontFamily:"'JetBrains Mono',monospace"}}>{cur==="AUD"?"A$":"$"}</span>
+
+        {/* Amount Input */}
+        <div style={{marginBottom:24, textAlign:"center"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            <span style={{fontSize:32,fontWeight:800,color:mode==="pago"?X.g:X.ac,fontFamily:"'JetBrains Mono'"}}>{cur==="AUD"?"A$":"$"}</span>
             <input ref={ref} type="text" inputMode="numeric" placeholder="0" value={fa(amt)} onChange={e=>setAmt(e.target.value.replace(/\./g,""))}
-              style={{flex:1,background:"transparent",border:"none",color:X.tx,fontSize:28,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",outline:"none",padding:0,width:"100%"}}/>
+              style={{background:"transparent",border:"none",color:X.tx,fontSize:42,fontWeight:800,fontFamily:"'JetBrains Mono'",outline:"none",width:"180px"}}/>
           </div>
-          <div style={{height:2,background:`linear-gradient(90deg,${mode==="pago"?X.g:X.ac},transparent)`,marginTop:3}}/>
+          {cur==="AUD"&&amt&&<div style={{fontSize:12,color:X.txD,marginTop:4}}>≈ {fmt(parseInt(amt.replace(/\D/g,""),10)*AUD_CLP)} CLP</div>}
         </div>
 
         {mode==="pago"?(
-          <>
-            <div style={{marginBottom:14}}>
-              <label style={{fontSize:9,textTransform:"uppercase",letterSpacing:1.2,color:X.txD,fontWeight:600}}>¿A cuál deuda?</label>
-              <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:6}}>
-                {debts.filter(d=>d.usado>0).map(d=>{
-                  const p=pct(d.usado,d.cupo);const sel=tid===d.id;
-                  return(<button key={d.id} onClick={()=>setTid(d.id)} style={{background:sel?"rgba(34,197,94,0.08)":"rgba(255,255,255,0.02)",border:`1px solid ${sel?"rgba(34,197,94,0.3)":X.bdr}`,borderRadius:12,padding:"12px 14px",cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:13,fontWeight:700,color:sel?X.g:X.tx}}>{d.name}</span><span style={{fontSize:12,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:X.r}}>{fmt(d.usado)}</span></div>
-                    <Br p={p} color={p>70?X.r:X.y} h={4}/>
-                  </button>);
-                })}
-              </div>
+          <div style={{marginBottom:20}}>
+            <label style={{fontSize:10,textTransform:"uppercase",letterSpacing:1.5,color:X.txD,fontWeight:700,display:"block",marginBottom:10}}>Seleccionar Deuda</label>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {debts.map(d=>{
+                const sel=tid===d.id;
+                return(<button key={d.id} onClick={()=>setTid(d.id)} style={{background:sel?"rgba(34,197,94,0.1)":X.card,border:`1px solid ${sel?X.g:X.bdr}`,borderRadius:16,padding:"14px",cursor:"pointer",textAlign:"left"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:14,fontWeight:700,color:sel?X.g:X.tx}}>{d.name}</span><span style={{fontSize:13,fontWeight:800,color:X.r}}>{fmt(d.usado)}</span></div>
+                  <Br p={pct(d.usado,d.cupo)} color={X.r} h={4}/>
+                </button>);
+              })}
             </div>
-          </>
+          </div>
         ):(
           <>
-            <div style={{marginBottom:14}}><label style={{fontSize:9,textTransform:"uppercase",letterSpacing:1.2,color:X.txD,fontWeight:600}}>Descripción</label><input type="text" placeholder="Ej: Bencina, Uber..." value={desc} onChange={e=>setDesc(e.target.value)} style={{width:"100%",background:"rgba(255,255,255,0.04)",border:`1px solid ${X.bdr}`,borderRadius:10,padding:"11px 14px",color:X.tx,fontSize:14,fontFamily:"inherit",outline:"none",marginTop:5,boxSizing:"border-box"}}/></div>
-            <div style={{marginBottom:14}}><label style={{fontSize:9,textTransform:"uppercase",letterSpacing:1.2,color:X.txD,fontWeight:600}}>Categoría</label><div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:5}}>{CATS.map(({n,g})=>{const gr=GROUPS[g];return(<button key={n} onClick={()=>setCat(n)} style={{background:cat===n?`${gr.c}22`:"rgba(255,255,255,0.03)",border:`1px solid ${cat===n?gr.c:X.bdr}`,borderRadius:14,padding:"5px 9px",color:cat===n?gr.c:X.txM,fontSize:10,fontWeight:cat===n?700:400,cursor:"pointer",fontFamily:"inherit"}}>{gr.i} {n}</button>);})}</div></div>
-            <div style={{marginBottom:14}}><label style={{fontSize:9,textTransform:"uppercase",letterSpacing:1.2,color:X.txD,fontWeight:600}}>Medio de pago</label><div style={{display:"flex",gap:5,marginTop:5,overflowX:"auto",paddingBottom:4}}>{CARDS.map(c=>(<button key={c} onClick={()=>setCard(c)} style={{background:card===c?"rgba(232,104,51,0.1)":"rgba(255,255,255,0.03)",border:`1px solid ${card===c?"rgba(232,104,51,0.4)":X.bdr}`,borderRadius:10,padding:"7px 11px",color:card===c?X.ac:X.txM,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",flexShrink:0}}>{c}</button>))}</div></div>
+            <div style={{marginBottom:18}}>
+              <label style={{fontSize:10,textTransform:"uppercase",letterSpacing:1.5,color:X.txD,fontWeight:700,display:"block",marginBottom:8}}>Descripción</label>
+              <input type="text" placeholder="¿En qué gastaste?" value={desc} onChange={e=>setDesc(e.target.value)} style={{width:"100%",background:X.card,border:`1px solid ${X.bdr}`,borderRadius:14,padding:"14px",color:X.tx,fontSize:15,outline:"none"}}/>
+              {ac.length>0&&<div style={{display:"flex",gap:6,marginTop:8,overflowX:"auto",paddingBottom:4}}>{ac.map((e,i)=>(<button key={i} onClick={()=>{setDesc(e.desc);setCat(e.category);setCard(e.card)}} style={{background:"rgba(255,255,255,0.05)",border:`1px solid ${X.bdr}`,borderRadius:20,padding:"6px 12px",color:X.txM,fontSize:11,whiteSpace:"nowrap"}}>{e.desc}</button>))}</div>}
+            </div>
+            <div style={{marginBottom:18}}>
+              <label style={{fontSize:10,textTransform:"uppercase",letterSpacing:1.5,color:X.txD,fontWeight:700,display:"block",marginBottom:8}}>Categoría {sug&&<span style={{color:X.g}}>✨</span>}</label>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{CATS.map(({n,g})=>{const gr=GROUPS[g];return(<button key={n} onClick={()=>setCat(n)} style={{background:cat===n?`${gr.c}22`:X.card,border:`1px solid ${cat===n?gr.c:X.bdr}`,borderRadius:20,padding:"7px 12px",color:cat===n?gr.c:X.txM,fontSize:11,fontWeight:cat===n?700:400}}>{gr.i} {n}</button>);})}</div>
+            </div>
+            <div style={{marginBottom:24}}>
+              <label style={{fontSize:10,textTransform:"uppercase",letterSpacing:1.5,color:X.txD,fontWeight:700,display:"block",marginBottom:8}}>Medio de Pago</label>
+              <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4}}>{CARDS.map(c=>(<button key={c} onClick={()=>setCard(c)} style={{background:card===c?X.ac:X.card,border:`1px solid ${card===c?X.ac:X.bdr}`,borderRadius:12,padding:"10px 14px",color:card===c?"#fff":X.txM,fontSize:12,fontWeight:700,whiteSpace:"nowrap"}}>{c}</button>))}</div>
+            </div>
           </>
         )}
-        <button onClick={save} disabled={!amt} style={{width:"100%",border:"none",borderRadius:12,padding:"13px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",background:!amt?"rgba(255,255,255,0.06)":mode==="pago"?"linear-gradient(135deg,#22C55E,#10B981)":"linear-gradient(135deg,#E86833,#F59E0B)",color:!amt?X.txD:"#fff"}}>Guardar</button>
+
+        <button onClick={save} disabled={!amt} style={{width:"100%",border:"none",borderRadius:16,padding:"16px",fontSize:16,fontWeight:800,cursor:"pointer",background:!amt?"rgba(255,255,255,0.1)":mode==="pago"?"linear-gradient(135deg,#22C55E,#10B981)":"linear-gradient(135deg,#E86833,#F59E0B)",color:"#fff",boxShadow:!amt?"none":"0 8px 24px rgba(232,104,51,0.3)"}}>
+          {mode==="pago"?"Confirmar Pago":"Guardar Registro"}
+        </button>
       </div>
     </div>
   );
@@ -219,6 +237,7 @@ export default function App() {
   const [saving,setSaving]=useState(false);
   const skipSync = useRef(false);
 
+  // Mapeo para sincronización automática
   const CARD_TO_DEBT = { "TC SANT Plat": "plat", "TC SANT Life": "life", "CMR Falabella": "cmr", "Línea Créd": "lc" };
 
   useEffect(()=>{
@@ -241,10 +260,12 @@ export default function App() {
     saveData({exps,pays,rules,bud,debts,savPct}).then(()=>setSaving(false));
   },[exps,pays,rules,bud,debts,savPct]);
 
-  useEffect(()=>{if(synced) {
-    const t = setTimeout(doSave, 800);
-    return () => clearTimeout(t);
-  }},[exps,pays,rules,bud,debts,savPct,synced,doSave]);
+  useEffect(()=>{
+    if(synced) {
+      const t = setTimeout(doSave, 800);
+      return () => clearTimeout(t);
+    }
+  },[exps,pays,rules,bud,debts,savPct,synced,doSave]);
 
   const addExp = e => {
     setExps(p => [e, ...p]);
@@ -257,7 +278,7 @@ export default function App() {
   const deleteExp = (id) => {
     const exp = exps.find(x => x.id === id);
     if (!exp) return;
-    if (confirm("¿Eliminar gasto?")) {
+    if (confirm("¿Eliminar este gasto?")) {
       setExps(p => p.filter(x => x.id !== id));
       const debtId = CARD_TO_DEBT[exp.card];
       if (debtId) {
@@ -266,11 +287,12 @@ export default function App() {
     }
   };
 
-  const addPay=p=>{
-    setPays(prev=>[p,...prev]);
-    setDebts(prev=>prev.map(d=>d.id===p.debtId?{...d,usado:Math.max(0,d.usado-p.amount)}:d));
+  const addPay = p => {
+    setPays(prev => [p, ...prev]);
+    setDebts(prev => prev.map(d => d.id === p.debtId ? { ...d, usado: Math.max(0, Number(d.usado) - Number(p.amount)) } : d));
   };
 
+  // Cálculos
   const mE=useMemo(()=>exps.filter(e=>mKey(e.date)===cm),[exps,cm]);
   const mP=useMemo(()=>pays.filter(p=>mKey(p.date)===cm),[pays,cm]);
   const mT=mE.reduce((a,e)=>a+e.amount,0);
@@ -284,110 +306,158 @@ export default function App() {
   const savAmt=Math.round(disp*savPct/100);
   const pGastar=disp-savAmt;
   const flujo=pGastar-mT;
-  const alerts=useMemo(()=>{const a=[];Object.entries(grp).forEach(([g,s])=>{const b=bud[g]||0;if(b>0&&s>b)a.push({g,over:s-b});});return a.sort((x,y)=>y.over-x.over);},[grp,bud]);
   const tDeuda=debts.reduce((a,d)=>a+d.usado,0);
   const tCupo=debts.reduce((a,d)=>a+d.cupo,0);
 
-  const dPlan=useMemo(()=>{
-    if(dEx<=0)return[];
-    let list=debts.map(d=>({...d,bal:d.usado,min:Math.max(Math.round(d.usado*0.02),5000)})).filter(d=>d.bal>0);
-    if(dSt==="avalancha")list.sort((a,b)=>b.tasa-a.tasa);else list.sort((a,b)=>a.bal-b.bal);
-    const tl=[];let mo=0;
-    while(list.some(d=>d.bal>0)&&mo<60){mo++;let ex=dEx;list.forEach(d=>{d.bal=Math.round(d.bal*(1+d.tasa/100));const p=Math.min(d.bal,d.min);d.bal-=p;});for(const d of list){if(ex<=0)break;const p=Math.min(d.bal,ex);d.bal=Math.max(0,d.bal-p);ex-=p;}tl.push({mes:mo,total:list.reduce((a,d)=>a+d.bal,0)});if(list.every(d=>d.bal<=0))break;}
-    return tl;
-  },[debts,dEx,dSt]);
-
   return(
-    <div style={{minHeight:"100vh",background:X.bg,color:X.tx,fontFamily:"'DM Sans',sans-serif",paddingBottom:80}}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet"/>
-      {saving&&<div style={{position:"fixed",top:8,left:"50%",transform:"translateX(-50%)",background:"rgba(232,104,51,0.2)",borderRadius:20,padding:"4px 12px",fontSize:10,color:X.ac,zIndex:200}}>Sincronizando...</div>}
-      <div style={{padding:"16px 18px",maxWidth:900,margin:"0 auto"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-          <h1 style={{fontSize:20,fontWeight:800,margin:0,background:"linear-gradient(135deg,#E86833,#F59E0B)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Mi Flujo</h1>
-          <input type="month" value={cm} onChange={e=>setCm(e.target.value)} style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${X.bdr}`,borderRadius:10,padding:"7px 10px",color:X.tx,colorScheme:"dark"}}/>
+    <div style={{minHeight:"100vh",background:X.bg,color:X.tx,fontFamily:"'DM Sans',sans-serif",paddingBottom:90}}>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet"/>
+      
+      {/* Syncing Status */}
+      {saving&&<div style={{position:"fixed",top:12,left:"50%",transform:"translateX(-50%)",background:"rgba(232,104,51,0.2)",borderRadius:20,padding:"4px 12px",fontSize:10,color:X.ac,zIndex:200,fontWeight:700,border:`1px solid ${X.ac}44`,backdropFilter:"blur(8px)"}}>Sincronizando...</div>}
+
+      <div style={{padding:"20px 18px 0",maxWidth:900,margin:"0 auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div>
+            <h1 style={{fontSize:22,fontWeight:800,margin:0,background:"linear-gradient(135deg,#E86833,#F59E0B)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Mi Flujo</h1>
+            <p style={{fontSize:11,color:X.txD,margin:"2px 0 0"}}>{mLabel(cm)} · {mE.length} registros {synced&&<span style={{color:X.g}}>●</span>}</p>
+          </div>
+          <input type="month" value={cm} onChange={e=>setCm(e.target.value)} style={{background:X.card,border:`1px solid ${X.bdr}`,borderRadius:12,padding:"8px 12px",color:X.tx,fontSize:12,colorScheme:"dark"}}/>
         </div>
       </div>
 
       <div style={{padding:"0 18px",maxWidth:900,margin:"0 auto"}}>
         {view==="home"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            <Cd s={{background:"linear-gradient(135deg,rgba(34,197,94,0.06),rgba(59,130,246,0.04))"}}>
-              <div style={{fontSize:9,textTransform:"uppercase",color:X.txD}}>Ingreso mensual</div>
-              <div style={{fontSize:28,fontWeight:800,color:X.g,fontFamily:"'JetBrains Mono'"}}>{fmt(totInc)}</div>
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            <Cd s={{background:"linear-gradient(135deg,rgba(34,197,94,0.08),rgba(59,130,246,0.05))"}}>
+              <div style={{fontSize:10,textTransform:"uppercase",letterSpacing:1.5,color:X.txD,fontWeight:700}}>Ingreso mensual (Piso)</div>
+              <div style={{fontSize:32,fontWeight:800,color:X.g,fontFamily:"'JetBrains Mono'",marginTop:6}}>{fmt(totInc)}</div>
+              <div style={{display:"flex",gap:12,marginTop:8,fontSize:11,color:X.txM}}><span>🇦🇺 {fmtS(audM)}</span><span>🇨🇱 {fmtS(INC.clpFixed)}</span></div>
             </Cd>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
-              <St label="Fijo" value={fmtS(fxT)} color={X.y}/>
-              <St label="P/Gastar" value={fmtS(pGastar)} color={X.b}/>
-              <St label="Flujo" value={fmtS(flujo)} color={flujo>=0?X.g:X.r}/>
+
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+              <St icon="📤" label="Fijo" value={fmtS(fxT)} color={X.y} sub="Créd+Hna+Cel"/>
+              <St icon="💰" label="P/Gastar" value={fmtS(pGastar)} color={X.b} sub={`${savPct}% ahorro`}/>
+              <St icon={flujo>=0?"✅":"🔴"} label="Flujo" value={fmtS(flujo)} color={flujo>=0?X.g:X.r}/>
             </div>
+
             <Cd>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><span style={{fontSize:12,color:X.txM}}>Gasto del Mes</span><span style={{fontSize:18,fontWeight:800}}>{fmt(mT)}</span></div>
-              <Br p={tB>0?mT/tB*100:0}/>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:10}}>
+                <span style={{fontSize:13,fontWeight:700,color:X.txM}}>Gasto del Mes</span>
+                <span style={{fontSize:20,fontWeight:800,fontFamily:"'JetBrains Mono'"}}>{fmt(mT)}</span>
+              </div>
+              <Br p={tB>0?mT/tB*100:0} h={7}/>
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:11,color:X.txD}}>
+                <span>{pct(mT,tB)}% del presupuesto</span>
+                <span>Límite: {fmtS(tB)}</span>
+              </div>
             </Cd>
+
             <Cd>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><span style={{fontSize:12,fontWeight:700}}>Últimos Gastos</span></div>
-              {mE.slice(0,5).map(e=>(
-                <div key={e.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:`1px solid ${X.bdr}`}}>
-                  <div style={{fontSize:12}}>{e.desc}</div>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{fontSize:12,fontWeight:700}}>{fmt(e.amount)}</span>
-                    <button onClick={()=>deleteExp(e.id)} style={{background:"transparent",border:"none",color:X.txD,cursor:"pointer"}}>×</button>
+              <h3 style={{fontSize:12,fontWeight:800,margin:"0 0 14px",color:X.txM,textTransform:"uppercase",letterSpacing:1}}>Por Grupo</h3>
+              {Object.entries(GROUPS).map(([g,info])=>{
+                const s=grp[g]||0,b=bud[g]||0,p=b>0?pct(s,b):0;
+                if(s===0 && b===0) return null;
+                return(<div key={g} style={{marginBottom:12}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:4,fontSize:12}}>
+                    <span>{info.i} {g}</span>
+                    <span style={{fontFamily:"'JetBrains Mono'",fontWeight:700}}>{fmt(s)}<span style={{color:X.txD,fontSize:10}}>/{fmtS(b)}</span></span>
                   </div>
-                </div>
-              ))}
+                  <Br p={b>0?p:(s/mT*100)} color={info.c} h={5}/>
+                </div>);
+              })}
             </Cd>
+
             <Cd>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><span style={{fontSize:12,fontWeight:700}}>💳 Deudas</span></div>
-              <div style={{fontSize:22,fontWeight:800,color:X.r}}>{fmt(tDeuda)}</div>
-              <Br p={pct(tDeuda,tCupo)} color={X.r}/>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><h3 style={{fontSize:12,fontWeight:800,margin:0,color:X.txM,textTransform:"uppercase",letterSpacing:1}}>Últimos Movimientos</h3><button onClick={()=>setView("list")} style={{background:"transparent",border:"none",color:X.ac,fontSize:11,fontWeight:700}}>Ver todo →</button></div>
+              {mE.slice(0,5).map(e=>{
+                const gr=GROUPS[e.group]||GROUPS.Otros;
+                return(<div key={e.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:`1px solid ${X.bdr}`}}>
+                  <div style={{width:36,height:36,borderRadius:10,background:`${gr.c}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>{gr.i}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:700}}>{e.desc}</div>
+                    <div style={{fontSize:10,color:X.txD}}>{e.card} · {e.category}</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:14,fontWeight:800,fontFamily:"'JetBrains Mono'"}}>{fmt(e.amount)}</div>
+                    <button onClick={()=>deleteExp(e.id)} style={{fontSize:11,color:X.r,background:"transparent",border:"none",padding:0,marginTop:2,cursor:"pointer"}}>Eliminar</button>
+                  </div>
+                </div>);
+              })}
+            </Cd>
+
+            <Cd alert={pct(tDeuda,tCupo)>75}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><h3 style={{fontSize:12,fontWeight:800,margin:0,color:X.txM,textTransform:"uppercase",letterSpacing:1}}>💳 Deudas Totales</h3><button onClick={()=>setView("debt")} style={{background:"transparent",border:"none",color:X.ac,fontSize:11,fontWeight:700}}>Plan →</button></div>
+              <div style={{fontSize:26,fontWeight:800,color:X.r,fontFamily:"'JetBrains Mono'",marginBottom:6}}>{fmt(tDeuda)}</div>
+              <Br p={pct(tDeuda,tCupo)} color={X.r} h={6}/>
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:11,color:X.txD}}><span>{pct(tDeuda,tCupo)}% de uso</span><span>Cupo: {fmtS(tCupo)}</span></div>
             </Cd>
           </div>
         )}
 
+        {/* ═══ LIST VIEW ═══ */}
         {view==="list"&&(
           <Cd>
-            <h3 style={{fontSize:12,marginBottom:10}}>Todos los Gastos</h3>
-            {mE.map(e=>(
-              <div key={e.id} style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:`1px solid ${X.bdr}`}}>
-                <div><div style={{fontSize:13,fontWeight:600}}>{e.desc}</div><div style={{fontSize:9,color:X.txD}}>{e.card} · {e.date}</div></div>
-                <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:14,fontWeight:700}}>{fmt(e.amount)}</span><button onClick={()=>deleteExp(e.id)} style={{fontSize:18,background:"transparent",border:"none",color:X.r,cursor:"pointer"}}>×</button></div>
-              </div>
-            ))}
+            <h3 style={{fontSize:14,fontWeight:800,marginBottom:16,textTransform:"uppercase",letterSpacing:1.5}}>Historial de Gastos</h3>
+            {mE.length===0 ? <p style={{textAlign:"center",color:X.txD,fontSize:13}}>No hay registros este mes</p> : 
+              mE.map(e=>(<div key={e.id} style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderBottom:`1px solid ${X.bdr}`}}>
+                <div>
+                  <div style={{fontSize:14,fontWeight:700}}>{e.desc}</div>
+                  <div style={{fontSize:10,color:X.txD}}>{e.date} · {e.card} · {e.category}</div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{fontSize:15,fontWeight:800,fontFamily:"'JetBrains Mono'"}}>{fmt(e.amount)}</div>
+                  <button onClick={()=>deleteExp(e.id)} style={{width:24,height:24,borderRadius:"50%",background:`${X.r}15`,border:"none",color:X.r,fontSize:16,cursor:"pointer"}}>×</button>
+                </div>
+              </div>))
+            }
           </Cd>
         )}
 
+        {/* ═══ BUDGET VIEW ═══ */}
         {view==="budget"&&(
           <Cd>
-            <h3 style={{fontSize:12,marginBottom:15}}>Presupuesto por Grupo</h3>
+            <h3 style={{fontSize:14,fontWeight:800,marginBottom:20,textTransform:"uppercase",letterSpacing:1.5}}>Configurar Presupuesto</h3>
             {Object.entries(GROUPS).map(([g,info])=>(
-              <div key={g} style={{marginBottom:15}}>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:4}}><span>{info.i} {g}</span><span>{fmt(grp[g]||0)} / {fmt(bud[g]||0)}</span></div>
-                <Br p={bud[g]>0?pct(grp[g]||0,bud[g]):0} color={info.c}/>
+              <div key={g} style={{marginBottom:18, padding:"12px", background:"rgba(255,255,255,0.02)", borderRadius:16, border:`1px solid ${X.bdr}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:8, fontSize:13}}><span>{info.i} {g}</span><span style={{fontWeight:800}}>{fmt(bud[g]||0)}</span></div>
+                <input type="number" step="10000" value={bud[g]} onChange={e=>setBud(prev=>({...prev,[g]:Math.max(0,Number(e.target.value))}))} style={{width:"100%",background:X.bg,border:`1px solid ${X.bdr}`,padding:10,borderRadius:10,color:X.tx,fontFamily:"'JetBrains Mono'",outline:"none"}}/>
               </div>
             ))}
           </Cd>
         )}
 
+        {/* ═══ DEBT VIEW ═══ */}
         {view==="debt"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            <Cd s={{background:"rgba(239,68,68,0.05)"}}><h3 style={{margin:"0 0 4px",fontSize:12,color:X.r,textTransform:"uppercase",letterSpacing:1.5,fontWeight:800}}>Plan de Pago</h3><p style={{fontSize:12,color:X.txM,margin:0}}>Sincronizado con tus gastos registrados.</p></Cd>
             {debts.map((d,di)=>(
               <Cd key={d.id}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:13,fontWeight:700}}>{d.name}</span><span>{pct(d.usado,d.cupo)}%</span></div>
-                <div style={{fontSize:16,fontWeight:800,color:X.r,marginBottom:8}}>{fmt(d.usado)}</div>
-                <Br p={pct(d.usado,d.cupo)} color={X.r}/>
-                <input type="number" value={d.usado} onChange={e=>setDebts(prev=>prev.map((x,i)=>i===di?{...x,usado:Number(e.target.value)}:x))} style={{width:"100%",marginTop:10,background:"rgba(255,255,255,0.05)",border:"none",padding:8,borderRadius:8,color:X.tx}}/>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><span style={{fontSize:14,fontWeight:800}}>{d.name}</span><span style={{fontSize:12,color:X.txD}}>{d.tasa}% tasa</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <div style={{fontSize:22,fontWeight:800,color:X.r,fontFamily:"'JetBrains Mono'"}}>{fmt(d.usado)}</div>
+                  <div style={{fontSize:12,color:X.txM}}>{pct(d.usado,d.cupo)}% cupo</div>
+                </div>
+                <Br p={pct(d.usado,d.cupo)} color={X.r} h={7}/>
+                <div style={{marginTop:12}}><label style={{fontSize:10,color:X.txD,display:"block",marginBottom:4}}>Ajuste Manual de Saldo</label><input type="number" value={d.usado} onChange={e=>setDebts(prev=>prev.map((x,i)=>i===di?{...x,usado:Number(e.target.value)}:x))} style={{width:"100%",background:X.bg,border:`1px solid ${X.bdr}`,padding:10,borderRadius:10,color:X.tx,fontFamily:"'JetBrains Mono'",outline:"none"}}/></div>
               </Cd>
             ))}
           </div>
         )}
       </div>
 
-      <button onClick={()=>setShow(true)} style={{position:"fixed",bottom:80,right:20,width:56,height:56,borderRadius:28,background:X.ac,border:"none",color:"#fff",fontSize:30,boxShadow:"0 4px 15px rgba(232,104,51,0.4)"}}>+</button>
-      <div style={{position:"fixed",bottom:0,left:0,right:0,background:"#0a0b12",borderTop:`1px solid ${X.bdr}`,display:"flex",padding:"10px 0"}}>
-        {[["home","🏠"],["list","📋"],["budget","🎯"],["debt","💳"]].map(([k,ic])=>(
-          <button key={k} onClick={()=>setView(k)} style={{flex:1,background:"transparent",border:"none",fontSize:20,filter:view===k?"grayscale(0)":"grayscale(1)"}}>{ic}</button>
+      {/* FAB */}
+      <button onClick={()=>setShow(true)} style={{position:"fixed",bottom:85,right:20,width:60,height:60,borderRadius:30,background:"linear-gradient(135deg,#E86833,#F59E0B)",border:"none",color:"#fff",fontSize:32,boxShadow:"0 8px 24px rgba(232,104,51,0.4)",zIndex:100,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+
+      {/* NAVIGATION */}
+      <div style={{position:"fixed",bottom:0,left:0,right:0,background:"rgba(10,11,18,0.95)",backdropFilter:"blur(16px)",borderTop:`1px solid ${X.bdr}`,display:"flex",padding:"10px 0 calc(env(safe-area-inset-bottom, 8px) + 8px)",zIndex:90}}>
+        {[["home","🏠","Inicio"],["list","📋","Gastos"],["budget","🎯","Presup."],["debt","💳","Deudas"]].map(([k,ic,lb])=>(
+          <button key={k} onClick={()=>setView(k)} style={{flex:1,background:"transparent",border:"none",color:view===k?X.ac:X.txD,fontSize:10,fontWeight:700,display:"flex",flexDirection:"column",alignItems:"center",gap:2,cursor:"pointer"}}>
+            <span style={{fontSize:20,filter:view===k?"none":"grayscale(1)"}}>{ic}</span>{lb}
+          </button>
         ))}
       </div>
+
       {show&&<QuickEntry onClose={()=>setShow(false)} onSaveExp={addExp} onSavePay={addPay} expenses={exps} debts={debts} custom={rules}/>}
     </div>
   );
